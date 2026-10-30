@@ -1,0 +1,67 @@
+<section class="tb-container tb-page-head">
+    <span class="tb-kicker">Explore</span>
+    <h1 class="tb-page-head__title">Browse by <em>topic</em></h1>
+    <p class="tb-page-head__lead">Every subject we write about, gathered in one place. Pick a topic to dive into its latest stories.</p>
+    <div class="tb-page-head__stats" id="tbTopicStats" hidden></div>
+</section>
+
+<section class="tb-container" style="padding-bottom:clamp(20px,4vw,40px)">
+    <div class="tb-grid tb-grid--3" id="tbTopicGrid"></div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB) return;
+    const { $, esc, url, data, mediaBox, state, errorState, fmt } = TB;
+    const grid = $('#tbTopicGrid');
+
+    function skeleton(n) {
+        let out = '';
+        for (let i = 0; i < n; i++) {
+            out += '<div class="tb-skel-card" style="border:1px solid var(--tb-line);border-radius:20px;overflow:hidden;gap:0">' +
+                '<div class="tb-skel" style="aspect-ratio:16/8;border-radius:0"></div>' +
+                '<div style="display:grid;gap:12px;padding:22px"><div class="tb-skel tb-skel--title" style="width:55%"></div><div class="tb-skel tb-skel--line"></div><div class="tb-skel tb-skel--line" style="width:80%"></div></div></div>';
+        }
+        return out;
+    }
+
+    function topicHTML(cat, res, i) {
+        const posts = res ? res.items : [];
+        const total = res ? res.total : 0;
+        const coverPost = posts.find((p) => p.cover) || { title: cat.name, category: cat.name };
+        return '<article class="tb-topic-card tb-reveal" style="--i:' + (i % 6) + '">' +
+            mediaBox(coverPost) +
+            '<span class="tb-topic-card__count">' + esc(fmt.count(total) + (total === 1 ? ' story' : ' stories')) + '</span>' +
+            '<div class="tb-topic-card__body">' +
+            '<h2 class="tb-topic-card__name"><a href="' + esc(url.category(cat.id)) + '">' + esc(cat.name) + '</a></h2>' +
+            (cat.description ? '<p class="tb-topic-card__desc">' + esc(cat.description) + '</p>' : '') +
+            (posts.length ? '<ul class="tb-topic-card__list">' + posts.slice(0, 3).map((p) => '<li><a href="' + esc(url.post(p.slug)) + '">' + esc(p.title) + '</a></li>').join('') + '</ul>' : '') +
+            '</div></article>';
+    }
+
+    (async function load() {
+        document.title = 'Topics — ' + (TB.config.siteName || '');
+        grid.innerHTML = skeleton(6);
+        try {
+            const cats = await data.categories();
+            if (!cats.length) {
+                grid.innerHTML = state('empty', 'No topics yet', 'Categories created in MdBlog will be listed here.');
+                return;
+            }
+            const results = await Promise.allSettled(cats.map((c) => data.posts({ category: c.id, limit: 3, page: 1, sort: 'latest' })));
+            const rows = cats.map((c, i) => ({ cat: c, res: results[i].status === 'fulfilled' ? results[i].value : null }));
+            rows.sort((a, b) => ((b.res ? b.res.total : 0) - (a.res ? a.res.total : 0)));
+            grid.innerHTML = rows.map((r, i) => topicHTML(r.cat, r.res, i)).join('');
+
+            const stories = rows.reduce((n, r) => n + (r.res ? r.res.total : 0), 0);
+            const stats = $('#tbTopicStats');
+            stats.innerHTML = '<span><strong>' + cats.length + '</strong> ' + (cats.length === 1 ? 'topic' : 'topics') + '</span><span><strong>' + fmt.count(stories) + '</strong> ' + (stories === 1 ? 'story' : 'stories') + '</span>';
+            stats.hidden = false;
+        } catch (err) {
+            grid.innerHTML = errorState(err);
+        }
+    })();
+});
+</script>

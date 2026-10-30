@@ -1,0 +1,71 @@
+<?php
+    // ThemeBlog2026 Studio — primary navigation. Only rendered by StudioLayout.html,
+    // never as a loose default-theme region on public pages.
+    $tbShowSidebar = defined('TB_STUDIO') && !defined('TB_STUDIO_SIDEBAR_DONE');
+    if ($tbShowSidebar) { define('TB_STUDIO_SIDEBAR_DONE', true); }
+    $tbSite = rtrim(ltSiteUrl(), '/');
+    $tbE = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+    $tbS = function ($view) use ($tbSite) { return $tbSite . '/ThemeBlog2026/Studio' . $view; };
+    $tbName = ltSiteName();
+    $tbIcon = function ($paths) { return '<svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true">' . $paths . '</svg>'; };
+?>
+<?php if ($tbShowSidebar): ?>
+<aside class="st-sidebar" aria-label="Studio navigation">
+    <div class="st-sidebar__brand">
+        <a class="tb-brand" href="<?= $tbE($tbS('Dashboard')) ?>">
+            <span class="tb-brand__mark" aria-hidden="true"><?= $tbE(function_exists('mb_substr') ? mb_substr($tbName, 0, 1) : substr($tbName, 0, 1)) ?></span>
+            <span class="tb-brand__name"><?= $tbE($tbName) ?><span class="tb-brand__dot">.</span></span>
+        </a>
+        <span class="st-sidebar__tag">Studio</span>
+    </div>
+
+    <a class="tb-btn tb-btn--accent tb-btn--block st-sidebar__new" href="<?= $tbE($tbS('Editor')) ?>">
+        <?= $tbIcon('<path d="M5 12h14M12 5v14"/>') ?> New post
+    </a>
+
+    <nav class="st-nav">
+        <p class="st-nav__label">Overview</p>
+        <a class="st-nav__link" data-st-nav="Dashboard" href="<?= $tbE($tbS('Dashboard')) ?>">
+            <?= $tbIcon('<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>') ?> Dashboard
+        </a>
+
+        <p class="st-nav__label">Content</p>
+        <a class="st-nav__link" data-st-nav="Posts" href="<?= $tbE($tbS('Posts')) ?>">
+            <?= $tbIcon('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/>') ?> Posts
+        </a>
+        <a class="st-nav__link" data-st-nav="Categories" href="<?= $tbE($tbS('Categories')) ?>">
+            <?= $tbIcon('<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>') ?> Categories
+        </a>
+        <a class="st-nav__link" data-st-nav="Tags" href="<?= $tbE($tbS('Tags')) ?>">
+            <?= $tbIcon('<path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.42l8.7 8.7a2.43 2.43 0 0 0 3.42 0l6.58-6.58a2.43 2.43 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/>') ?> Tags
+        </a>
+
+        <p class="st-nav__label">Community</p>
+        <a class="st-nav__link" data-st-nav="Comments" href="<?= $tbE($tbS('Comments')) ?>">
+            <?= $tbIcon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>') ?> Comments
+            <span class="st-nav__count" data-st-count="comments" hidden></span>
+        </a>
+        <a class="st-nav__link" data-st-nav="Reports" href="<?= $tbE($tbS('Reports')) ?>">
+            <?= $tbIcon('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>') ?> Reports
+            <span class="st-nav__count" data-st-count="reports" hidden></span>
+        </a>
+
+        <p class="st-nav__label">Account</p>
+        <a class="st-nav__link" data-st-nav="Settings" href="<?= $tbE($tbS('Settings')) ?>">
+            <?= $tbIcon('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>') ?> Blog settings
+        </a>
+        <a class="st-nav__link" data-st-nav="Profile" href="<?= $tbE($tbS('Profile')) ?>">
+            <?= $tbIcon('<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>') ?> My profile
+        </a>
+    </nav>
+
+    <div class="st-sidebar__foot">
+        <a class="st-nav__link" href="<?= $tbE($tbSite . '/ThemeBlog2026/Home') ?>" target="_blank" rel="noopener">
+            <?= $tbIcon('<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>') ?> View site
+        </a>
+        <a class="st-nav__link" href="#" data-st-signout>
+            <?= $tbIcon('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>') ?> Sign out
+        </a>
+    </div>
+</aside>
+<?php endif; ?>

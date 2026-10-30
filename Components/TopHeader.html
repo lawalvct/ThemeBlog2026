@@ -1,0 +1,129 @@
+<?php
+    // ThemeBlog2026 — opens the document, loads fonts, styles and the shared script.
+    //
+    // Layouts define TB_LAYOUT before importing this component. When AppCore instead
+    // attaches the theme's default components to a page as loose regions (for example
+    // the site's index page when ThemeBlog2026 is the default theme), no layout is
+    // present: this component then renders the whole page — head, header, the page's
+    // content and footer — and Header/Footer skip their own region output, so the
+    // region order does not matter.
+    $tbRegionMode = !defined('TB_LAYOUT');
+    if ($tbRegionMode) { define('TB_LAYOUT', 'region'); }
+    $tbRenderHead = !defined('TB_HEAD_DONE');
+    if ($tbRenderHead) { define('TB_HEAD_DONE', true); }
+    $tbFlags =JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
+    $tbAssets = rtrim(ltThemePath(), '/') . '/ThemeBlog2026/Assets';
+    $tbVersion = '1.0.0';
+    // Cache-busting query: the theme version plus the file's modification time, so
+    // browsers fetch fresh CSS/JS whenever an asset changes (paths are relative to the app root).
+    $tbAsset = function ($rel) use ($tbAssets, $tbVersion) {
+        $file = 'packages/themes/ThemeBlog2026/Assets/' . $rel;
+        $ver = is_file($file) ? $tbVersion . '.' . filemtime($file) : $tbVersion;
+        return htmlspecialchars($tbAssets . '/' . $rel . '?v=' . $ver, ENT_QUOTES, 'UTF-8');
+    };
+    $tbTitle = function_exists('ltPageTitle') ? ltPageTitle() : ltSiteName();
+    $tbFavicon = function_exists('ltSiteFaviconUrl') ? ltSiteFaviconUrl() : '';
+    $tbDescription = function_exists('ltSiteTitle') ? ltSiteTitle() : '';
+    // Studio layouts define these constants before importing this component.
+    $tbStudio = defined('TB_STUDIO');
+    $tbStudioAuth = defined('TB_STUDIO_AUTH');
+    $tbStudioLogin = rtrim(ltSiteUrl(), '/') . '/ThemeBlog2026/StudioLogin';
+?>
+<?php if ($tbRenderHead): ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title><?= htmlspecialchars($tbTitle, ENT_QUOTES, 'UTF-8') ?></title>
+    <meta name="description" content="<?= htmlspecialchars($tbDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:site_name" content="<?= htmlspecialchars(ltSiteName(), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:title" content="<?= htmlspecialchars($tbTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#11100d" media="(prefers-color-scheme: dark)">
+    <?php if ($tbFavicon !== ''): ?>
+    <link rel="icon" href="<?= htmlspecialchars($tbFavicon, ENT_QUOTES, 'UTF-8') ?>">
+    <?php endif; ?>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..700&family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..600&display=swap">
+    <link rel="stylesheet" href="<?= $tbAsset('css/Style.css') ?>">
+    <?php if ($tbStudio): ?>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" href="<?= $tbAsset('css/Studio.css') ?>">
+    <?php if (!$tbStudioAuth): ?>
+    <script>
+        // Studio pages need a signed-in editor: send guests to the sign-in page before rendering.
+        (function () {
+            try {
+                if (!localStorage.getItem(<?= json_encode(ApiTokenDetails::tokenName(), $tbFlags) ?>)) {
+                    window.location.replace(<?= json_encode($tbStudioLogin, $tbFlags) ?> + '?next=' + encodeURIComponent(window.location.pathname + window.location.search));
+                }
+            } catch (e) { /* storage unavailable */ }
+        })();
+    </script>
+    <?php endif; ?>
+    <?php endif; ?>
+
+    <script>
+        // Apply the saved colour scheme before first paint to avoid a flash.
+        (function () {
+            try {
+                var saved = localStorage.getItem('tb-theme');
+                var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+            } catch (e) { /* storage unavailable */ }
+        })();
+
+        // Runtime settings for Assets/js/Script.js. Edit "routes" if you rename
+        // a view or give it a pretty route such as "/blog/{slug}".
+        window.TB_CONFIG = {
+            pkg: 'ThemeBlog2026',
+            version: <?= json_encode($tbVersion, $tbFlags) ?>,
+            apiBase: <?= json_encode(rtrim(ApiTokenDetails::backEndBaseUrl(), '/'), $tbFlags) ?>,
+            siteUrl: <?= json_encode(rtrim(ltSiteUrl(), '/'), $tbFlags) ?>,
+            siteHost: <?= json_encode(rtrim(ltSiteHostAddress(), '/'), $tbFlags) ?>,
+            siteName: <?= json_encode(ltSiteName(), $tbFlags) ?>,
+            tokenName: <?= json_encode(ApiTokenDetails::tokenName(), $tbFlags) ?>,
+            routes: {
+                home: '/ThemeBlog2026/Home',
+                blog: '/ThemeBlog2026/Blog',
+                post: '/ThemeBlog2026/Post',
+                topics: '/ThemeBlog2026/Topics',
+                category: '/ThemeBlog2026/Category',
+                author: '/ThemeBlog2026/Author',
+                signIn: '/MdBlog/Sign-in',
+                signUp: '/MdBlog/Sign-up',
+                profile: '/MdBlog/User-profile'
+            }
+        };
+    </script>
+    <script defer src="<?= $tbAsset('js/Script.js') ?>"></script>
+    <?php if ($tbStudio): ?>
+    <script defer src="<?= $tbAsset('js/Studio.js') ?>"></script>
+    <?php endif; ?>
+</head>
+<body class="tb-body<?= $tbStudio ? ' st-body' : '' ?>">
+    <a class="tb-skip" href="#tb-main">Skip to content</a>
+<?php if ($tbRegionMode): ?>
+<?php
+    // ltImport() includes a component only once per request, and AppCore may already
+    // have run Header/Footer as (silent) regions — include their files directly instead.
+    $tbPart = function ($name) {
+        $file = 'packages/themes/ThemeBlog2026/Components/' . $name;
+        if (is_file($file)) { include $file; } else { ltImport('ThemeBlog2026', $name); }
+    };
+    $tbPart('Header.html');
+?>
+<main class="tb-main" id="tb-main">
+    <!-- Content from other packages: give it a container and readable defaults. -->
+    <div class="tb-container tb-region">
+        <?php dddm::loadDynamicContent(); ?>
+    </div>
+</main>
+<?php $tbPart('Footer.html'); ?>
+<?php endif; ?>
+<?php endif; ?>

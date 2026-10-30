@@ -1,0 +1,195 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">Tags</h1>
+        <p class="st-head__sub">Short labels with a colour, managed by MdBlog for use across your content.</p>
+    </div>
+    <div class="st-head__actions">
+        <button class="tb-btn tb-btn--accent" type="button" id="stNewTag">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg> New tag
+        </button>
+    </div>
+</div>
+
+<section class="st-card st-card--flush">
+    <div class="st-toolbar">
+        <div class="st-toolbar__search">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <label class="tb-sr" for="stTagSearch">Search tags</label>
+            <input class="tb-input" id="stTagSearch" type="search" placeholder="Search tags…">
+        </div>
+    </div>
+    <div class="st-table-wrap">
+        <table class="st-table">
+            <thead><tr><th>Tag</th><th>Slug</th><th>Colour</th><th>Status</th><th>Updated</th><th class="st-actions-col"><span class="tb-sr">Actions</span></th></tr></thead>
+            <tbody id="stTagRows"></tbody>
+        </table>
+    </div>
+</section>
+
+<div class="tb-modal" id="stTagModal" hidden>
+    <div class="tb-modal__backdrop" data-tb-close></div>
+    <form class="tb-modal__panel" id="stTagForm" role="dialog" aria-modal="true" aria-labelledby="stTagTitle" novalidate>
+        <button class="tb-icon-btn tb-icon-btn--plain tb-modal__close" type="button" data-tb-close aria-label="Close">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <h2 class="tb-modal__title" id="stTagTitle">New tag</h2>
+        <div class="tb-modal__body">
+            <div class="st-form-row">
+                <div class="tb-field">
+                    <label class="tb-label" for="stTagName">Name</label>
+                    <input class="tb-input" id="stTagName" name="tagName" maxlength="80" required>
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stTagSlug">Slug</label>
+                    <input class="tb-input" id="stTagSlug" name="tagSlug" maxlength="100" spellcheck="false">
+                </div>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stTagDesc">Description</label>
+                <textarea class="tb-textarea" id="stTagDesc" name="tagDescription" rows="2" maxlength="300"></textarea>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stTagColorText">Colour</label>
+                <div class="st-field-inline">
+                    <input class="tb-input" type="color" id="stTagColor" value="#c8371d" aria-label="Pick a colour">
+                    <input class="tb-input" id="stTagColorText" name="tagColor" value="#c8371d" maxlength="20" spellcheck="false" style="flex:1">
+                </div>
+            </div>
+            <div class="tb-modal__actions">
+                <button class="tb-btn tb-btn--ghost" type="button" data-tb-close>Cancel</button>
+                <button class="tb-btn tb-btn--accent" type="submit" id="stTagSave">Save tag</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, esc, plain, fmt, icon, api, studio } = TB;
+
+    studio.setTitle('Tags');
+    const rowsEl = $('#stTagRows');
+    const modal = $('#stTagModal');
+    const form = $('#stTagForm');
+    let tags = [];
+    let editing = null;
+    let slugTouched = false;
+    let q = '';
+    const safeColor = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c || '').trim()) ? String(c).trim() : '#999999');
+
+    function normalize(t) {
+        return {
+            id: String(t.ltId), name: plain(t.tagName), slug: plain(t.tagSlug), description: plain(t.tagDescription || ''),
+            color: safeColor(t.tagColor), status: t.status || 'isActive', updated: t.updatedAt || t.createdAt || ''
+        };
+    }
+
+    function row(t) {
+        const active = t.status !== 'isNotActive';
+        return '<tr data-id="' + esc(t.id) + '">' +
+            '<td><div class="st-cell-title" style="min-width:200px"><span><strong>' + esc(t.name) + '</strong><span class="st-cell-sub">' + esc(t.description || 'No description') + '</span></span></div></td>' +
+            '<td class="st-cell-muted"><code>' + esc(t.slug) + '</code></td>' +
+            '<td class="st-cell-muted"><span class="st-swatch" style="background:' + esc(t.color) + '"></span> ' + esc(t.color) + '</td>' +
+            '<td>' + studio.badge(active ? 'isActive' : 'isNotActive') + '</td>' +
+            '<td class="st-cell-muted">' + esc(t.updated ? fmt.date(t.updated) : '—') + '</td>' +
+            '<td class="st-actions-col"><span class="st-row-actions">' +
+            '<button class="st-icon-btn" type="button" data-edit title="Edit" aria-label="Edit ' + esc(t.name) + '">' + icon('edit') + '</button>' +
+            '<button class="st-icon-btn' + (active ? '' : ' st-icon-btn--good') + '" type="button" data-toggle title="' + (active ? 'Deactivate' : 'Activate') + '" aria-label="' + (active ? 'Deactivate ' : 'Activate ') + esc(t.name) + '">' + icon(active ? 'eye' : 'check') + '</button>' +
+            '<button class="st-icon-btn st-icon-btn--danger" type="button" data-delete title="Delete" aria-label="Delete ' + esc(t.name) + '">' + icon('trash') + '</button>' +
+            '</span></td></tr>';
+    }
+
+    function render() {
+        const list = tags.filter((t) => !q || t.name.toLowerCase().indexOf(q) !== -1 || t.slug.indexOf(q) !== -1);
+        rowsEl.innerHTML = list.length ? list.map(row).join('')
+            : studio.emptyRow(6, tags.length ? 'No tags match' : 'No tags yet', tags.length ? 'Try a different search.' : 'Create a tag to label your content.');
+    }
+
+    async function load() {
+        rowsEl.innerHTML = studio.skeletonRows(6, 4);
+        try {
+            tags = (await studio.list('blogs/tags')).map(normalize);
+            render();
+        } catch (err) {
+            rowsEl.innerHTML = '<tr class="st-table__empty"><td colspan="6">' + TB.state('error', 'Unable to load tags', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    function setColor(c) {
+        $('#stTagColorText').value = c;
+        if (/^#[0-9a-f]{6}$/i.test(c)) $('#stTagColor').value = c;
+    }
+
+    function openForm(tag) {
+        editing = tag || null;
+        slugTouched = !!tag;
+        $('#stTagTitle').textContent = tag ? 'Edit tag' : 'New tag';
+        form.tagName.value = tag ? tag.name : '';
+        form.tagSlug.value = tag ? tag.slug : '';
+        form.tagDescription.value = tag ? tag.description : '';
+        setColor(tag ? tag.color : '#c8371d');
+        TB.openModal(modal);
+    }
+
+    $('#stNewTag').addEventListener('click', () => openForm(null));
+    $('#stTagSearch').addEventListener('input', TB.debounce((e) => { q = e.target.value.trim().toLowerCase(); render(); }, 150));
+    form.tagName.addEventListener('input', () => { if (!slugTouched) form.tagSlug.value = studio.slugify(form.tagName.value); });
+    form.tagSlug.addEventListener('input', () => { slugTouched = true; });
+    $('#stTagColor').addEventListener('input', (e) => { $('#stTagColorText').value = e.target.value; });
+    $('#stTagColorText').addEventListener('input', (e) => { if (/^#[0-9a-f]{6}$/i.test(e.target.value)) $('#stTagColor').value = e.target.value; });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') TB.closeModal(modal); });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = form.tagName.value.trim();
+        if (!name) { form.tagName.focus(); TB.toast('Give the tag a name.', 'error'); return; }
+        const body = {
+            tagName: name,
+            tagSlug: studio.slugify(form.tagSlug.value || name),
+            tagDescription: form.tagDescription.value.trim(),
+            tagColor: safeColor($('#stTagColorText').value)
+        };
+        await studio.busy($('#stTagSave'), 'Saving…', async () => {
+            try {
+                if (editing) await api.patch('blogs/tags/' + encodeURIComponent(editing.id), body);
+                else await api.post('blogs/tags', body);
+                TB.closeModal(modal);
+                TB.toast(editing ? 'Tag updated' : 'Tag created', 'success');
+                load();
+            } catch (err) {
+                TB.toast(studio.explain(err), 'error');
+            }
+        });
+    });
+
+    rowsEl.addEventListener('click', async (e) => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const tag = tags.find((t) => t.id === tr.dataset.id);
+        if (!tag) return;
+        if (e.target.closest('[data-edit]')) { openForm(tag); return; }
+        if (e.target.closest('[data-toggle]')) {
+            try {
+                await api.patch('blogs/tags/' + encodeURIComponent(tag.id) + '/toggle-active');
+                TB.toast(tag.status === 'isNotActive' ? 'Tag activated' : 'Tag deactivated', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+            return;
+        }
+        if (e.target.closest('[data-delete]')) {
+            const ok = await studio.confirm({ title: 'Delete “' + tag.name + '”?', text: 'This removes the tag permanently.', confirmLabel: 'Delete tag', danger: true });
+            if (!ok) return;
+            try {
+                await api.del('blogs/tags/' + encodeURIComponent(tag.id));
+                TB.toast('Tag deleted', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        }
+    });
+
+    load();
+});
+</script>

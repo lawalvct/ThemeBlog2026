@@ -1,0 +1,209 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">My profile</h1>
+        <p class="st-head__sub">This is how you appear in story bylines, author cards and your author page.</p>
+    </div>
+    <div class="st-head__actions">
+        <a class="tb-btn tb-btn--ghost" id="stViewAuthor" href="#" target="_blank" rel="noopener" hidden>
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg> View author page
+        </a>
+    </div>
+</div>
+
+<div class="st-grid st-grid--2">
+    <section class="st-card">
+        <form class="st-form" id="stProfileForm" novalidate>
+            <div class="st-avatar-edit">
+                <span id="stAvatarPreview"></span>
+                <div>
+                    <label class="tb-btn tb-btn--ghost tb-btn--sm" for="stAvatarFile" style="cursor:pointer">
+                        <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg> Change photo
+                    </label>
+                    <input id="stAvatarFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+                    <p class="st-hint" style="margin-top:6px">JPG, PNG or WebP. A square image works best.</p>
+                </div>
+            </div>
+            <div class="st-form-row">
+                <div class="tb-field">
+                    <label class="tb-label" for="stFullname">Full name</label>
+                    <input class="tb-input" id="stFullname" name="fullname" maxlength="120" autocomplete="name">
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stLocation">Location</label>
+                    <input class="tb-input" id="stLocation" name="location" maxlength="120" placeholder="Lagos, Nigeria">
+                </div>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stBio">Short bio</label>
+                <textarea class="tb-textarea" id="stBio" name="bio" rows="4" maxlength="500" placeholder="A sentence or two about you and what you write about."></textarea>
+                <span class="st-hint st-hint--count" data-count-for="stBio" data-max="280"></span>
+            </div>
+            <div class="st-form-row">
+                <div class="tb-field">
+                    <label class="tb-label" for="stTwitter">X (Twitter)</label>
+                    <input class="tb-input" id="stTwitter" name="twitter" maxlength="200" placeholder="@handle or profile URL">
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stLinkedin">LinkedIn</label>
+                    <input class="tb-input" id="stLinkedin" name="linkedin" maxlength="200" placeholder="Profile URL">
+                </div>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stFacebook">Facebook</label>
+                <input class="tb-input" id="stFacebook" name="facebook" maxlength="200" placeholder="Profile URL">
+            </div>
+            <div><button class="tb-btn tb-btn--accent" type="submit" id="stProfileSave">Save profile</button></div>
+        </form>
+    </section>
+
+    <div class="st-grid" style="align-content:start">
+        <section class="st-card">
+            <div class="st-card__head">
+                <div>
+                    <h2 class="st-card__title">Account</h2>
+                    <p class="st-card__sub">Managed by LifeTech OCMS.</p>
+                </div>
+            </div>
+            <dl class="st-form" style="gap:10px;margin:0">
+                <div><dt class="st-hint">Username</dt><dd style="margin:2px 0 0;font-weight:600" id="stUsername">—</dd></div>
+                <div><dt class="st-hint">Email</dt><dd style="margin:2px 0 0;font-weight:600" id="stEmail">—</dd></div>
+                <div><dt class="st-hint">Member since</dt><dd style="margin:2px 0 0;font-weight:600" id="stJoined">—</dd></div>
+            </dl>
+            <button class="tb-btn tb-btn--ghost tb-btn--sm" type="button" data-st-signout style="margin-top:16px">Sign out</button>
+        </section>
+
+        <section class="st-card">
+            <div class="st-card__head">
+                <div>
+                    <h2 class="st-card__title">Change password</h2>
+                    <p class="st-card__sub">At least 8 characters.</p>
+                </div>
+            </div>
+            <form class="st-form" id="stPassForm" novalidate>
+                <div class="tb-field">
+                    <label class="tb-label" for="stCurrentPass">Current password</label>
+                    <input class="tb-input" id="stCurrentPass" type="password" autocomplete="current-password" required>
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stNewPass">New password</label>
+                    <input class="tb-input" id="stNewPass" type="password" autocomplete="new-password" minlength="8" required>
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stConfirmPass">Confirm new password</label>
+                    <input class="tb-input" id="stConfirmPass" type="password" autocomplete="new-password" minlength="8" required>
+                </div>
+                <div><button class="tb-btn" type="submit" id="stPassSave">Update password</button></div>
+            </form>
+        </section>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, $$, plain, fmt, api, auth, url, studio } = TB;
+
+    studio.setTitle('My profile');
+    const user = auth.user() || {};
+    const form = $('#stProfileForm');
+    let avatarSrc = '';
+    let avatarFile = null;
+
+    function paintAvatar() {
+        const name = form.fullname.value.trim() || user.username || 'Editor';
+        $('#stAvatarPreview').innerHTML = TB.avatar(name, avatarSrc, 84);
+    }
+
+    function updateCounts() {
+        $$('[data-count-for]').forEach((hint) => {
+            const n = document.getElementById(hint.dataset.countFor).value.length;
+            const max = Number(hint.dataset.max);
+            hint.textContent = n + ' / ' + max;
+            hint.classList.toggle('is-over', n > max);
+        });
+    }
+
+    async function load() {
+        paintAvatar();
+        updateCounts();
+        if (!user.ltId) {
+            TB.toast('Your account id is missing. Sign out and sign in again to edit your profile.', 'error');
+            return;
+        }
+        form.style.opacity = '.55';
+        try {
+            const rec = await TB.data.author(user.ltId);
+            form.fullname.value = plain(rec.fullname || '');
+            form.location.value = plain(rec.location || '');
+            form.bio.value = plain(rec.bio || '');
+            form.twitter.value = rec.twitter || '';
+            form.linkedin.value = rec.linkedin || '';
+            form.facebook.value = rec.facebook || '';
+            avatarSrc = url.media(rec.avatar || '');
+            $('#stUsername').textContent = plain(rec.username || user.username || '—');
+            $('#stEmail').textContent = plain(rec.email || '—');
+            $('#stJoined').textContent = rec.joined ? fmt.date(rec.joined) : '—';
+            const link = $('#stViewAuthor');
+            link.href = url.author(user.ltId);
+            link.hidden = false;
+            paintAvatar();
+            updateCounts();
+        } catch (err) {
+            TB.toast(studio.explain(err), 'error');
+        } finally {
+            form.style.opacity = '';
+        }
+    }
+
+    $('#stAvatarFile').addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        if (['image/jpeg', 'image/png', 'image/webp'].indexOf(f.type) === -1) { TB.toast('Choose a JPG, PNG or WebP image.', 'error'); return; }
+        if (f.size > 5 * 1024 * 1024) { TB.toast('Choose an image smaller than 5 MB.', 'error'); return; }
+        avatarFile = f;
+        avatarSrc = URL.createObjectURL(f);
+        paintAvatar();
+    });
+    form.fullname.addEventListener('input', paintAvatar);
+    form.bio.addEventListener('input', updateCounts);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData();
+        fd.append('ltId', user.ltId || '');
+        ['fullname', 'location', 'bio', 'twitter', 'linkedin', 'facebook'].forEach((k) => fd.append(k, form[k].value.trim()));
+        if (avatarFile) fd.append('avatarFile', avatarFile, avatarFile.name);
+        await studio.busy($('#stProfileSave'), 'Saving…', async () => {
+            try {
+                await api.form('blogs/user/update', fd);
+                avatarFile = null;
+                const details = Object.assign({}, user, { fullname: form.fullname.value.trim() });
+                TB.store.set(auth.detailsKey(), JSON.stringify(details));
+                TB.toast('Profile saved', 'success');
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        });
+    });
+
+    $('#stPassForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const current = $('#stCurrentPass').value;
+        const next = $('#stNewPass').value;
+        const confirm = $('#stConfirmPass').value;
+        if (!current || !next || !confirm) { TB.toast('Fill in all three password fields.', 'error'); return; }
+        if (next.length < 8) { TB.toast('The new password must be at least 8 characters.', 'error'); return; }
+        if (next !== confirm) { TB.toast('The new passwords do not match.', 'error'); return; }
+        if (next === current) { TB.toast('Choose a password different from the current one.', 'error'); return; }
+        await studio.busy($('#stPassSave'), 'Updating…', async () => {
+            try {
+                await api.post('blogs/user/change-password', { userId: user.ltId, currentPassword: current, newPassword: next, confirmPassword: confirm });
+                e.target.reset();
+                TB.toast('Password updated', 'success');
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        });
+    });
+
+    load();
+});
+</script>

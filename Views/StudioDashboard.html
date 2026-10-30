@@ -1,0 +1,233 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title" id="stGreeting">Dashboard</h1>
+        <p class="st-head__sub" id="stToday"></p>
+    </div>
+    <div class="st-head__actions">
+        <a class="tb-btn tb-btn--accent" data-st-link="Editor" href="#">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg> New post
+        </a>
+    </div>
+</div>
+
+<section class="st-grid st-grid--stats" id="stStats" aria-label="Key figures"></section>
+
+<div class="st-grid st-grid--2" style="margin-top:20px">
+    <section class="st-card">
+        <div class="st-card__head">
+            <div>
+                <h2 class="st-card__title">Publishing activity</h2>
+                <p class="st-card__sub">Posts published per day · last 120 days</p>
+            </div>
+        </div>
+        <div id="stTrend"><div class="tb-skel" style="height:220px"></div></div>
+    </section>
+    <section class="st-card">
+        <div class="st-card__head">
+            <div>
+                <h2 class="st-card__title">Top categories</h2>
+                <p class="st-card__sub">By total views</p>
+            </div>
+            <a class="tb-more-link" data-st-link="Categories" href="#">Manage</a>
+        </div>
+        <div class="st-bars" id="stTopCats"><div class="tb-skel" style="height:180px"></div></div>
+    </section>
+</div>
+
+<div class="st-grid st-grid--halves" style="margin-top:20px">
+    <section class="st-card st-card--flush">
+        <div class="st-card__head">
+            <h2 class="st-card__title">Recent posts</h2>
+            <a class="tb-more-link" data-st-link="Posts" href="#">All posts</a>
+        </div>
+        <div class="st-table-wrap">
+            <table class="st-table">
+                <thead><tr><th>Post</th><th>Status</th><th class="st-num">Views</th></tr></thead>
+                <tbody id="stRecentPosts"></tbody>
+            </table>
+        </div>
+    </section>
+    <section class="st-card st-card--flush">
+        <div class="st-card__head">
+            <h2 class="st-card__title">Latest comments</h2>
+            <a class="tb-more-link" data-st-link="Comments" href="#">Moderate</a>
+        </div>
+        <div class="st-table-wrap">
+            <table class="st-table">
+                <thead><tr><th>Comment</th><th>Status</th></tr></thead>
+                <tbody id="stRecentComments"></tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, $$, esc, plain, fmt, icon, api, auth, studio } = TB;
+
+    studio.setTitle('Dashboard');
+    $$('[data-st-link]').forEach((a) => { a.href = studio.url(a.dataset.stLink); });
+
+    const user = auth.user() || {};
+    const hour = new Date().getHours();
+    const part = hour < 12 ? 'morning' : (hour < 18 ? 'afternoon' : 'evening');
+    $('#stGreeting').textContent = 'Good ' + part + (user.username ? ', ' + String(user.fullname || user.username).split(' ')[0] : '');
+    $('#stToday').textContent = fmt.longDate() + ' — here is how your blog is doing.';
+
+    function tile(label, value, iconName, note) {
+        return '<div class="st-card st-stat"><div class="st-stat__top"><span class="st-stat__label">' + esc(label) + '</span>' +
+            '<span class="st-stat__icon">' + icon(iconName) + '</span></div>' +
+            '<div class="st-stat__value">' + esc(value) + '</div>' +
+            (note ? '<div class="st-stat__note">' + note + '</div>' : '') + '</div>';
+    }
+
+    // Round the y-axis maximum up to a clean number of whole posts.
+    function niceMax(v) {
+        if (v <= 4) return Math.max(1, Math.ceil(v));
+        const pow = Math.pow(10, Math.floor(Math.log10(v)));
+        const steps = [1, 2, 2.5, 5, 10];
+        for (let i = 0; i < steps.length; i++) if (steps[i] * pow >= v) return steps[i] * pow;
+        return 10 * pow;
+    }
+
+    function trendChart(rows) {
+        const el = $('#stTrend');
+        if (!rows.length) {
+            el.innerHTML = TB.state('empty', 'No posts published recently', 'Published posts from the last 120 days will appear here.');
+            return;
+        }
+        const W = 640, H = 230, L = 34, R = 8, T = 12, B = 28;
+        const pw = W - L - R, ph = H - T - B;
+        const max = niceMax(Math.max.apply(null, rows.map((r) => Number(r.postCount) || 0)));
+        const ticks = max <= 4 ? Array.from({ length: max + 1 }, (_, i) => i) : [0, max / 2, max];
+        const band = pw / rows.length;
+        const bw = Math.max(3, Math.min(24, band - 2));
+        const y = (v) => T + ph - (v / max) * ph;
+        const labelEvery = Math.max(1, Math.ceil(rows.length / 6));
+
+        let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Posts published per day">';
+        svg += '<g class="st-chart__grid">' + ticks.map((t) => '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(t) + '" y2="' + y(t) + '"/>').join('') + '</g>';
+        svg += '<g class="st-chart__axis">' + ticks.map((t) => '<text x="' + (L - 8) + '" y="' + (y(t) + 4) + '" text-anchor="end">' + fmt.count(t) + '</text>').join('');
+        rows.forEach((r, i) => {
+            if (i % labelEvery === 0 || i === rows.length - 1) {
+                svg += '<text x="' + (L + band * i + band / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(r.label) + '</text>';
+            }
+        });
+        svg += '</g>';
+        rows.forEach((r, i) => {
+            const v = Number(r.postCount) || 0;
+            const x = L + band * i + (band - bw) / 2;
+            const top = y(v);
+            const h = Math.max(0, T + ph - top);
+            const rad = Math.min(4, bw / 2, h);
+            // 4px rounded data end, square at the baseline
+            const d = h <= 0 ? '' : 'M' + x + ',' + (T + ph) + 'V' + (top + rad) + 'Q' + x + ',' + top + ' ' + (x + rad) + ',' + top +
+                'H' + (x + bw - rad) + 'Q' + (x + bw) + ',' + top + ' ' + (x + bw) + ',' + (top + rad) + 'V' + (T + ph) + 'Z';
+            svg += '<g class="st-chart__col" data-i="' + i + '"><path class="st-chart__bar" d="' + d + '"/>' +
+                '<rect class="st-chart__hit" x="' + (L + band * i) + '" y="' + T + '" width="' + band + '" height="' + ph + '"/></g>';
+        });
+        svg += '</svg>';
+
+        const table = '<details class="st-data-table"><summary>View data as a table</summary><div class="st-table-wrap"><table class="st-table"><thead><tr><th>Day</th><th class="st-num">Posts</th><th class="st-num">Views</th></tr></thead><tbody>' +
+            rows.map((r) => '<tr><td>' + esc(r.label) + '</td><td class="st-num">' + fmt.count(r.postCount) + '</td><td class="st-num">' + fmt.count(r.views) + '</td></tr>').join('') +
+            '</tbody></table></div></details>';
+        el.innerHTML = '<div class="st-chart">' + svg + '<div class="st-tip" hidden></div></div>' + table;
+
+        const chart = el.querySelector('.st-chart');
+        const tip = chart.querySelector('.st-tip');
+        chart.addEventListener('mousemove', (e) => {
+            const col = e.target.closest('.st-chart__col');
+            $$('.st-chart__col.is-hover', chart).forEach((c) => c !== col && c.classList.remove('is-hover'));
+            if (!col) { tip.hidden = true; return; }
+            col.classList.add('is-hover');
+            const r = rows[Number(col.dataset.i)];
+            const box = chart.getBoundingClientRect();
+            const bar = col.querySelector('.st-chart__hit').getBoundingClientRect();
+            tip.innerHTML = '<strong>' + esc(r.label) + '</strong>' + fmt.plural(r.postCount, 'post') + ' · <span>' + fmt.plural(r.views, 'view') + '</span>';
+            tip.style.left = (bar.left - box.left + bar.width / 2) + 'px';
+            tip.style.top = (e.clientY - box.top) + 'px';
+            tip.hidden = false;
+        });
+        chart.addEventListener('mouseleave', () => { tip.hidden = true; $$('.st-chart__col.is-hover', chart).forEach((c) => c.classList.remove('is-hover')); });
+    }
+
+    function topCategories(rows) {
+        const el = $('#stTopCats');
+        if (!rows.length) { el.innerHTML = TB.state('empty', 'No categories yet', 'Create categories to organise your posts.'); return; }
+        const max = Math.max(1, Math.max.apply(null, rows.map((r) => Number(r.viewCount) || 0)));
+        el.innerHTML = rows.map((r) => {
+            const v = Number(r.viewCount) || 0;
+            return '<div class="st-hbar"><div class="st-hbar__row"><strong>' + esc(plain(r.name)) + '</strong><span>' +
+                fmt.plural(r.postCount, 'post') + ' · ' + fmt.plural(v, 'view') + '</span></div>' +
+                '<div class="st-hbar__track"><div class="st-hbar__fill" style="width:' + Math.max(v > 0 ? 2 : 0, (v / max) * 100) + '%"></div></div></div>';
+        }).join('');
+    }
+
+    async function loadMetrics() {
+        try {
+            const m = await studio.metrics();
+            const c = (m && m.cards) || {};
+            const pc = Number(c.pendingComments) || 0;
+            const pr = Number(c.pendingReports) || 0;
+            $('#stStats').innerHTML =
+                tile('Total views', fmt.count(c.totalViews), 'eye', 'Across all published posts') +
+                tile('Posts', fmt.count(c.totalArticles), 'fileText', '<a href="' + esc(studio.url('Posts')) + '">Manage posts</a>') +
+                tile('Comments', fmt.count(c.totalComments), 'message', pc ? '<a href="' + esc(studio.url('Comments')) + '">' + pc + ' awaiting review</a>' : 'Nothing awaiting review') +
+                tile('Open reports', fmt.count(pr), 'flag', pr ? '<a href="' + esc(studio.url('Reports')) + '">Review reports</a>' : 'All clear');
+            trendChart(Array.isArray(m.trend) ? m.trend : []);
+            topCategories(Array.isArray(m.topCategories) ? m.topCategories : []);
+        } catch (err) {
+            const msg = studio.explain(err);
+            $('#stStats').innerHTML = '<div class="st-card" style="grid-column:1/-1">' + TB.state('error', 'Unable to load dashboard metrics', msg) + '</div>';
+            $('#stTrend').innerHTML = '';
+            $('#stTopCats').innerHTML = '';
+        }
+    }
+
+    async function loadRecentPosts() {
+        const body = $('#stRecentPosts');
+        body.innerHTML = studio.skeletonRows(3, 5);
+        try {
+            const rows = (await studio.list('blogs/posts')).map((p) => Object.assign(TB.normalizePost(p), { updated: p.updatedAt || p.createdAt || '' }));
+            rows.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+            body.innerHTML = rows.length ? rows.slice(0, 6).map((p) =>
+                '<tr><td><div class="st-cell-title">' + TB.mediaBox(p, { small: true }) + '<span><strong><a href="' + esc(studio.url('Editor', { id: p.id })) + '">' + esc(p.title) + '</a></strong>' +
+                '<span class="st-cell-sub">' + esc(p.updated ? 'Updated ' + fmt.ago(p.updated) : '') + '</span></span></div></td>' +
+                '<td>' + studio.badge(p.status) + '</td><td class="st-num">' + fmt.count(p.views) + '</td></tr>').join('')
+                : studio.emptyRow(3, 'No posts yet', 'Write your first story to see it here.');
+        } catch (err) {
+            body.innerHTML = '<tr class="st-table__empty"><td colspan="3">' + TB.state('error', 'Unable to load posts', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    function flatten(list, out) {
+        (list || []).forEach((c) => { out.push(c); flatten(c.replies, out); });
+        return out;
+    }
+
+    async function loadRecentComments() {
+        const body = $('#stRecentComments');
+        body.innerHTML = studio.skeletonRows(2, 5);
+        try {
+            const rows = flatten(await studio.list('blogs/comments'), []);
+            rows.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+            body.innerHTML = rows.length ? rows.slice(0, 6).map((c) => {
+                const name = plain(c.commentedBy || c.author) || 'Reader';
+                const text = plain(c.body);
+                return '<tr><td><div class="st-cell-title" style="min-width:0">' + TB.avatar(name, '', 32) + '<span><strong>' + esc(name) +
+                    '</strong><span class="st-cell-sub">' + esc(text.length > 90 ? text.slice(0, 88) + '…' : text) + '</span></span></div></td>' +
+                    '<td>' + studio.badge(c.status) + '</td></tr>';
+            }).join('') : studio.emptyRow(2, 'No comments yet', 'Reader comments will appear here.');
+        } catch (err) {
+            body.innerHTML = '<tr class="st-table__empty"><td colspan="2">' + TB.state('error', 'Unable to load comments', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    loadMetrics();
+    loadRecentPosts();
+    loadRecentComments();
+});
+</script>

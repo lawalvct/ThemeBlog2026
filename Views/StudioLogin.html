@@ -1,0 +1,110 @@
+<?php
+    $tbE = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+    $tbSite = rtrim(ltSiteUrl(), '/');
+    $tbName = ltSiteName();
+?>
+<div class="st-auth">
+    <section class="st-auth__art" aria-hidden="true">
+        <span class="tb-brand"><span class="tb-brand__mark"><?= $tbE(function_exists('mb_substr') ? mb_substr($tbName, 0, 1) : substr($tbName, 0, 1)) ?></span><span class="tb-brand__name"><?= $tbE($tbName) ?><span class="tb-brand__dot">.</span></span></span>
+        <p class="st-auth__quote">Write, edit and publish stories — <em>beautifully</em>.</p>
+        <p class="st-auth__meta">ThemeBlog2026 Studio · powered by MdBlog</p>
+    </section>
+
+    <section class="st-auth__form">
+        <form class="st-auth__card" id="stLoginForm" novalidate>
+            <div>
+                <h1 class="st-auth__title">Welcome back</h1>
+                <p class="st-auth__sub">Sign in to manage your blog.</p>
+            </div>
+
+            <div class="st-auth__error" id="stLoginError" role="alert" hidden></div>
+
+            <div class="tb-field">
+                <label class="tb-label" for="stEmail">Email or username</label>
+                <input class="tb-input" id="stEmail" name="email" type="text" autocomplete="username" required autofocus>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stPassword">Password</label>
+                <div class="st-pass">
+                    <input class="tb-input" id="stPassword" name="password" type="password" autocomplete="current-password" required>
+                    <button class="st-icon-btn" type="button" id="stTogglePass" aria-label="Show password">
+                        <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <button class="tb-btn tb-btn--accent tb-btn--block" type="submit" id="stLoginBtn" style="min-height:48px">Sign in to Studio</button>
+            <p class="st-auth__foot"><a href="<?= $tbE($tbSite . '/ThemeBlog2026/Home') ?>">&larr; Back to the site</a></p>
+        </form>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, api, auth, studio } = TB;
+
+    const next = studio.safeNext(new URLSearchParams(window.location.search).get('next'));
+    const goNext = () => window.location.replace(next || studio.url('Dashboard'));
+    document.title = 'Sign in · Studio — ' + (TB.config.siteName || '');
+
+    if (auth.token()) { goNext(); return; }
+
+    const form = $('#stLoginForm');
+    const errorBox = $('#stLoginError');
+    const showError = (msg) => { errorBox.textContent = msg; errorBox.hidden = false; };
+
+    // MdBlog only signs in accounts that already have a blog profile. Editors who have
+    // never used MdBlog fall back to the core OCMS login; MdBlog then creates their
+    // profile the first time their record is requested.
+    async function signIn(email, password) {
+        try {
+            return { data: await api.post('blogs/auth/signin', { email: email, password: password }), core: false };
+        } catch (err) {
+            if (err.code !== '3018' && !/no user found/i.test(err.message || '')) throw err;
+            return { data: await api.post('users/login', { username: email, password: password }), core: true };
+        }
+    }
+
+    $('#stTogglePass').addEventListener('click', (e) => {
+        const input = $('#stPassword');
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        e.currentTarget.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorBox.hidden = true;
+        const email = form.email.value.trim();
+        const password = form.password.value;
+        if (!email || !password) { showError('Enter your email or username and your password.'); return; }
+
+        await studio.busy($('#stLoginBtn'), 'Signing in…', async () => {
+            try {
+                const res = await signIn(email, password);
+                const data = res.data || {};
+                const name = data.tokenName || TB.config.tokenName;
+                const token = data[name] || data[TB.config.tokenName] || data.token;
+                if (!token) { showError('Signed in, but the server did not return a session token.'); return; }
+
+                const ltId = String(data.ltId || data.userId || '');
+                const fullname = data.fullname || [data.firstName, data.surname].filter(Boolean).join(' ');
+                TB.store.set(TB.config.tokenName, token);
+                if (name !== TB.config.tokenName) TB.store.set(name, token);
+                // Store only what the Studio needs — never password hashes or salts.
+                TB.store.set(auth.detailsKey(), JSON.stringify({ ltId: ltId, username: data.username || email, fullname: fullname }));
+
+                if (res.core && ltId) {
+                    try { await TB.data.author(ltId); } catch (e) { /* profile is created on first use */ }
+                }
+                goNext();
+            } catch (err) {
+                showError(err.message || 'Sign-in failed. Check your details and try again.');
+            }
+        });
+    });
+});
+</script>

@@ -1,0 +1,11 @@
+<?php if (!defined('TB_LAYOUT')) { define('TB_LAYOUT', 'studio-auth'); } ?>
+<?php if (!defined('TB_STUDIO')) { define('TB_STUDIO', true); } ?>
+<?php if (!defined('TB_STUDIO_AUTH')) { define('TB_STUDIO_AUTH', true); } ?>
+<?php ltImport('ThemeBlog2026', 'TopHeader.html'); ?>
+
+<!-- Full-screen wrapper for the Studio sign-in view (no sidebar, no sign-in redirect). -->
+<main class="st-auth-wrap" id="tb-main">
+    <?php dddm::loadDynamicContent(); ?>
+</main>
+</body>
+</html>

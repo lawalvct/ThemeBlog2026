@@ -1,0 +1,172 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">Categories</h1>
+        <p class="st-head__sub">Topics that organise your stories. Active categories appear on the site's Topics pages.</p>
+    </div>
+    <div class="st-head__actions">
+        <button class="tb-btn tb-btn--accent" type="button" id="stNewCat">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg> New category
+        </button>
+    </div>
+</div>
+
+<section class="st-card st-card--flush">
+    <div class="st-toolbar">
+        <div class="st-toolbar__search">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <label class="tb-sr" for="stCatSearch">Search categories</label>
+            <input class="tb-input" id="stCatSearch" type="search" placeholder="Search categories…">
+        </div>
+    </div>
+    <div class="st-table-wrap">
+        <table class="st-table">
+            <thead><tr><th>Category</th><th class="st-num">Posts</th><th>In menus</th><th>Status</th><th>Updated</th><th class="st-actions-col"><span class="tb-sr">Actions</span></th></tr></thead>
+            <tbody id="stCatRows"></tbody>
+        </table>
+    </div>
+</section>
+
+<div class="tb-modal" id="stCatModal" hidden>
+    <div class="tb-modal__backdrop" data-tb-close></div>
+    <form class="tb-modal__panel" id="stCatForm" role="dialog" aria-modal="true" aria-labelledby="stCatTitle" novalidate>
+        <button class="tb-icon-btn tb-icon-btn--plain tb-modal__close" type="button" data-tb-close aria-label="Close">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <h2 class="tb-modal__title" id="stCatTitle">New category</h2>
+        <div class="tb-modal__body">
+            <div class="tb-field">
+                <label class="tb-label" for="stCatName">Name</label>
+                <input class="tb-input" id="stCatName" name="categoryName" maxlength="150" required>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stCatDesc">Description</label>
+                <textarea class="tb-textarea" id="stCatDesc" name="categoryDescription" rows="3" maxlength="500" placeholder="Shown on the Topics and category pages."></textarea>
+            </div>
+            <label class="st-switch"><span class="st-switch__text"><strong>Show in menus</strong><small>Include in the site's topic navigation</small></span><input type="checkbox" id="stCatMenu" checked><span class="st-switch__ui"></span></label>
+            <div class="tb-modal__actions">
+                <button class="tb-btn tb-btn--ghost" type="button" data-tb-close>Cancel</button>
+                <button class="tb-btn tb-btn--accent" type="submit" id="stCatSave">Save category</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, esc, plain, fmt, icon, api, url, studio } = TB;
+
+    studio.setTitle('Categories');
+    const rowsEl = $('#stCatRows');
+    const modal = $('#stCatModal');
+    const form = $('#stCatForm');
+    let cats = [];
+    let counts = {};
+    let editing = null;
+    let q = '';
+
+    function row(c) {
+        const active = c.status !== 'isNotActive';
+        return '<tr data-id="' + esc(c.id) + '">' +
+            '<td><div class="st-cell-title" style="min-width:220px"><span><strong>' + (active ? '<a href="' + esc(url.category(c.id)) + '" target="_blank" rel="noopener">' + esc(c.name) + '</a>' : esc(c.name)) + '</strong>' +
+            '<span class="st-cell-sub">' + esc(c.description || 'No description') + '</span></span></div></td>' +
+            '<td class="st-num">' + fmt.count(counts[c.id] || 0) + '</td>' +
+            '<td class="st-cell-muted">' + (c.showOnMenu ? 'Yes' : 'No') + '</td>' +
+            '<td>' + studio.badge(active ? 'isActive' : 'isNotActive') + '</td>' +
+            '<td class="st-cell-muted">' + esc(c.raw.updatedAt ? fmt.date(c.raw.updatedAt) : '—') + '</td>' +
+            '<td class="st-actions-col"><span class="st-row-actions">' +
+            '<button class="st-icon-btn" type="button" data-edit title="Edit" aria-label="Edit ' + esc(c.name) + '">' + icon('edit') + '</button>' +
+            '<button class="st-icon-btn' + (active ? '' : ' st-icon-btn--good') + '" type="button" data-toggle title="' + (active ? 'Deactivate' : 'Activate') + '" aria-label="' + (active ? 'Deactivate ' : 'Activate ') + esc(c.name) + '">' + icon(active ? 'eye' : 'check') + '</button>' +
+            '<button class="st-icon-btn st-icon-btn--danger" type="button" data-delete title="Delete" aria-label="Delete ' + esc(c.name) + '">' + icon('trash') + '</button>' +
+            '</span></td></tr>';
+    }
+
+    function render() {
+        const list = cats.filter((c) => !q || c.name.toLowerCase().indexOf(q) !== -1 || c.description.toLowerCase().indexOf(q) !== -1);
+        rowsEl.innerHTML = list.length ? list.map(row).join('')
+            : studio.emptyRow(6, cats.length ? 'No categories match' : 'No categories yet', cats.length ? 'Try a different search.' : 'Create your first category to start organising posts.');
+    }
+
+    async function load() {
+        rowsEl.innerHTML = studio.skeletonRows(6, 4);
+        try {
+            const res = await Promise.all([studio.categories(), studio.list('blogs/posts').catch(() => [])]);
+            cats = res[0];
+            counts = {};
+            res[1].forEach((p) => { const k = String(p.categoryId || ''); counts[k] = (counts[k] || 0) + 1; });
+            render();
+        } catch (err) {
+            rowsEl.innerHTML = '<tr class="st-table__empty"><td colspan="6">' + TB.state('error', 'Unable to load categories', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    function openForm(cat) {
+        editing = cat || null;
+        $('#stCatTitle').textContent = cat ? 'Edit category' : 'New category';
+        form.categoryName.value = cat ? cat.name : '';
+        form.categoryDescription.value = cat ? cat.description : '';
+        $('#stCatMenu').checked = cat ? cat.showOnMenu : true;
+        TB.openModal(modal);
+    }
+
+    $('#stNewCat').addEventListener('click', () => openForm(null));
+    $('#stCatSearch').addEventListener('input', TB.debounce((e) => { q = e.target.value.trim().toLowerCase(); render(); }, 150));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') TB.closeModal(modal); });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = form.categoryName.value.trim();
+        if (!name) { form.categoryName.focus(); TB.toast('Give the category a name.', 'error'); return; }
+        const body = { categoryName: name, categoryDescription: form.categoryDescription.value.trim(), showOnMenu: $('#stCatMenu').checked ? 1 : 0 };
+        await studio.busy($('#stCatSave'), 'Saving…', async () => {
+            try {
+                if (editing) await api.patch('blogs/categories/' + encodeURIComponent(editing.id), body);
+                else await api.post('blogs/categories', body);
+                TB.closeModal(modal);
+                TB.toast(editing ? 'Category updated' : 'Category created', 'success');
+                load();
+            } catch (err) {
+                TB.toast(studio.explain(err), 'error');
+            }
+        });
+    });
+
+    rowsEl.addEventListener('click', async (e) => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const cat = cats.find((c) => c.id === tr.dataset.id);
+        if (!cat) return;
+
+        if (e.target.closest('[data-edit]')) { openForm(cat); return; }
+
+        if (e.target.closest('[data-toggle]')) {
+            try {
+                await api.patch('blogs/categories/' + encodeURIComponent(cat.id) + '/toggle-active');
+                TB.toast(cat.status === 'isNotActive' ? 'Category activated' : 'Category deactivated', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+            return;
+        }
+
+        if (e.target.closest('[data-delete]')) {
+            const n = counts[cat.id] || 0;
+            const ok = await studio.confirm({
+                title: 'Delete “' + plain(cat.name) + '”?',
+                text: n ? n + ' post' + (n === 1 ? ' uses' : 's use') + ' this category and will be left without one.' : 'This category has no posts.',
+                confirmLabel: 'Delete category',
+                danger: true
+            });
+            if (!ok) return;
+            try {
+                await api.del('blogs/categories/' + encodeURIComponent(cat.id));
+                TB.toast('Category deleted', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        }
+    });
+
+    load();
+});
+</script>

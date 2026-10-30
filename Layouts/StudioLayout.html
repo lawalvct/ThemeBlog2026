@@ -1,0 +1,18 @@
+<?php if (!defined('TB_LAYOUT')) { define('TB_LAYOUT', 'studio'); } ?>
+<?php if (!defined('TB_STUDIO')) { define('TB_STUDIO', true); } ?>
+<?php ltImport('ThemeBlog2026', 'TopHeader.html'); ?>
+
+<!-- Editor workspace: assigned to the Studio views through Storage/Layouts/PendingLayouts.json. -->
+<div class="st-app" data-st-app>
+    <?php ltImport('ThemeBlog2026', 'StudioSidebar.html'); ?>
+    <div class="st-backdrop" data-st-sidebar-close></div>
+
+    <div class="st-main">
+        <?php ltImport('ThemeBlog2026', 'StudioTopbar.html'); ?>
+        <main class="st-content" id="tb-main">
+            <?php dddm::loadDynamicContent(); ?>
+        </main>
+    </div>
+</div>
+</body>
+</html>

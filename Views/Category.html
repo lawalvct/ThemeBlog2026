@@ -1,0 +1,121 @@
+<?php
+    $tbFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+    // Works with ?id=… and with a pretty page route such as /topic/{id}.
+    $tbCategoryId = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+?>
+<section class="tb-container tb-page-head" id="tbCatHead">
+    <nav class="tb-crumbs" aria-label="Breadcrumb" id="tbCrumbs"></nav>
+    <div style="margin-top:20px"><span class="tb-kicker">Topic</span></div>
+    <h1 class="tb-page-head__title" id="tbCatTitle"><span class="tb-skel" style="display:inline-block;width:min(420px,70vw);height:.9em;vertical-align:middle"></span></h1>
+    <p class="tb-page-head__lead" id="tbCatDesc" hidden></p>
+    <div class="tb-page-head__stats" id="tbCatStats" hidden></div>
+</section>
+
+<div class="tb-container">
+    <div class="tb-toolbar">
+        <div class="tb-toolbar__row" style="justify-content:space-between">
+            <div class="tb-chips" id="tbOtherTopics" aria-label="Other topics" style="flex:1 1 300px"></div>
+            <div class="tb-toolbar__sort">
+                <label class="tb-sr" for="tbCatSort">Sort stories</label>
+                <select class="tb-select" id="tbCatSort">
+                    <option value="latest">Newest first</option>
+                    <option value="popular">Most read</option>
+                    <option value="liked">Most liked</option>
+                    <option value="comments">Most discussed</option>
+                    <option value="oldest">Oldest first</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="tb-grid tb-grid--3" id="tbCatGrid"></div>
+    <nav class="tb-pager" id="tbCatPager" aria-label="Pagination"></nav>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB) return;
+    const { $, esc, url, data, card, state, errorState, skeletonCards, pager, icon, fmt } = TB;
+
+    const ID = TB.param('id', <?= json_encode($tbCategoryId, $tbFlags) ?>);
+    const PER_PAGE = 12;
+    const grid = $('#tbCatGrid');
+    const pagerEl = $('#tbCatPager');
+    const sortEl = $('#tbCatSort');
+    const params = new URLSearchParams(window.location.search);
+    let page = Math.max(1, parseInt(params.get('page'), 10) || 1);
+    let sort = ['latest', 'popular', 'liked', 'comments', 'oldest'].indexOf(params.get('sort')) !== -1 ? params.get('sort') : 'latest';
+    let category = null;
+    sortEl.value = sort;
+
+    $('#tbCrumbs').innerHTML = '<a href="' + esc(url.home()) + '">Home</a>' + icon('chevronRight') + '<a href="' + esc(url.topics()) + '">Topics</a>';
+
+    function pushUrl() {
+        const p = new URLSearchParams(window.location.search);
+        if (page > 1) p.set('page', page); else p.delete('page');
+        if (sort !== 'latest') p.set('sort', sort); else p.delete('sort');
+        history.replaceState(null, '', window.location.pathname + (p.toString() ? '?' + p.toString() : ''));
+    }
+
+    async function loadPosts(scroll) {
+        grid.innerHTML = skeletonCards(6);
+        pagerEl.innerHTML = '';
+        if (scroll) $('#tbCatGrid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+            const res = await data.posts({ category: ID, page: page, limit: PER_PAGE, sort: sort });
+            const stats = $('#tbCatStats');
+            stats.innerHTML = '<span><strong>' + res.total + '</strong> ' + (res.total === 1 ? 'story' : 'stories') + '</span>' +
+                (res.items[0] && res.items[0].date && sort === 'latest' && page === 1 ? '<span>Last updated <strong>' + esc(fmt.date(res.items[0].date)) + '</strong></span>' : '');
+            stats.hidden = false;
+            grid.innerHTML = res.items.length
+                ? res.items.map((p, i) => card.standard(p, { index: i % 6 })).join('')
+                : state('empty', 'No stories in this topic yet', 'Check back soon, or explore another topic.', { href: url.topics(), label: 'All topics' });
+            pagerEl.innerHTML = pager(res.page, res.pages);
+        } catch (err) {
+            grid.innerHTML = errorState(err);
+        }
+    }
+
+    async function loadCategory() {
+        let cats = [];
+        try { cats = await data.categories(); } catch (e) { /* header still shows */ }
+        category = cats.find((c) => c.id === String(ID)) || null;
+
+        if (!category) {
+            $('#tbCatTitle').textContent = 'Topic not found';
+            $('#tbCatDesc').textContent = 'This topic may have been renamed or removed.';
+            $('#tbCatDesc').hidden = false;
+        } else {
+            $('#tbCatTitle').textContent = category.name;
+            $('#tbCrumbs').insertAdjacentHTML('beforeend', icon('chevronRight') + '<span>' + esc(category.name) + '</span>');
+            if (category.description) { $('#tbCatDesc').textContent = category.description; $('#tbCatDesc').hidden = false; }
+            document.title = category.name + ' — ' + (TB.config.siteName || '');
+        }
+
+        const others = cats.filter((c) => !category || c.id !== category.id);
+        $('#tbOtherTopics').innerHTML = others.length
+            ? '<span class="tb-topic-strip__label" style="align-self:center">Also explore</span>' + others.map((c) => '<a class="tb-pill" href="' + esc(url.category(c.id)) + '">' + esc(c.name) + '</a>').join('')
+            : '';
+    }
+
+    sortEl.addEventListener('change', () => { sort = sortEl.value; page = 1; pushUrl(); loadPosts(false); });
+    pagerEl.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-page]');
+        if (!b || b.disabled) return;
+        page = parseInt(b.dataset.page, 10) || 1;
+        pushUrl();
+        loadPosts(true);
+    });
+
+    if (!ID) {
+        $('#tbCatTitle').textContent = 'Choose a topic';
+        grid.innerHTML = state('empty', 'No topic selected', 'Pick a topic to see its stories.', { href: url.topics(), label: 'Browse topics' });
+        loadCategory();
+        return;
+    }
+    loadCategory();
+    loadPosts(false);
+});
+</script>

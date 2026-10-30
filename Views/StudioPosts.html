@@ -1,0 +1,173 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">Posts</h1>
+        <p class="st-head__sub" id="stPostsSub">Every story on the blog, in every state.</p>
+    </div>
+    <div class="st-head__actions">
+        <a class="tb-btn tb-btn--accent" id="stNewPost" href="#">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg> New post
+        </a>
+    </div>
+</div>
+
+<section class="st-card st-card--flush">
+    <div class="st-toolbar">
+        <div class="st-tabs" role="tablist" aria-label="Filter by status" id="stStatusTabs"></div>
+        <div class="st-toolbar__spacer"></div>
+        <div class="st-toolbar__search">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <label class="tb-sr" for="stPostSearch">Search posts</label>
+            <input class="tb-input" id="stPostSearch" type="search" placeholder="Search title or slug…">
+        </div>
+        <label class="tb-sr" for="stPostCat">Category</label>
+        <select class="tb-select" id="stPostCat"><option value="">All categories</option></select>
+        <label class="tb-sr" for="stPostSort">Sort</label>
+        <select class="tb-select" id="stPostSort">
+            <option value="updated">Recently updated</option>
+            <option value="newest">Newest published</option>
+            <option value="views">Most viewed</option>
+            <option value="title">Title A–Z</option>
+        </select>
+    </div>
+    <div class="st-table-wrap">
+        <table class="st-table">
+            <thead>
+                <tr><th>Post</th><th>Category</th><th>Status</th><th class="st-num">Views</th><th>Date</th><th class="st-actions-col"><span class="tb-sr">Actions</span></th></tr>
+            </thead>
+            <tbody id="stPostRows"></tbody>
+        </table>
+    </div>
+    <div class="st-table-foot">
+        <span id="stPostInfo"></span>
+        <nav class="tb-pager" id="stPostPager" aria-label="Pagination"></nav>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, $$, esc, fmt, icon, api, url, studio } = TB;
+
+    studio.setTitle('Posts');
+    $('#stNewPost').href = studio.url('Editor');
+
+    const PER_PAGE = 15;
+    const TABS = [['all', 'All'], ['published', 'Published'], ['draft', 'Drafts'], ['pending', 'Pending'], ['scheduled', 'Scheduled'], ['private', 'Private'], ['archived', 'Archived']];
+    const rowsEl = $('#stPostRows');
+    let posts = [];
+    let cats = [];
+    const st = { status: 'all', q: '', cat: '', sort: 'updated', page: 1 };
+
+    const catName = (id) => { const c = cats.find((x) => x.id === String(id)); return c ? c.name : ''; };
+
+    function renderTabs() {
+        $('#stStatusTabs').innerHTML = TABS.map((t) => {
+            const n = t[0] === 'all' ? posts.length : posts.filter((p) => p.status === t[0]).length;
+            if (t[0] !== 'all' && t[0] !== 'published' && t[0] !== 'draft' && !n) return '';
+            return '<button class="st-tab" role="tab" type="button" data-status="' + t[0] + '" aria-selected="' + (st.status === t[0]) + '">' + t[1] + ' <span class="st-tab__count">' + n + '</span></button>';
+        }).join('');
+    }
+
+    function filtered() {
+        const q = st.q.toLowerCase();
+        const list = posts.filter((p) => (st.status === 'all' || p.status === st.status) &&
+            (!st.cat || p.categoryId === st.cat) &&
+            (!q || p.title.toLowerCase().indexOf(q) !== -1 || p.slug.toLowerCase().indexOf(q) !== -1));
+        const by = {
+            updated: (a, b) => String(b.updated).localeCompare(String(a.updated)),
+            newest: (a, b) => String(b.date).localeCompare(String(a.date)),
+            views: (a, b) => b.views - a.views,
+            title: (a, b) => a.title.localeCompare(b.title)
+        }[st.sort];
+        return list.sort(by);
+    }
+
+    function row(p) {
+        const editHref = esc(studio.url('Editor', { id: p.id }));
+        const dateLabel = p.status === 'published' && p.date ? fmt.date(p.date) : (p.updated ? 'Edited ' + fmt.ago(p.updated) : '—');
+        return '<tr data-id="' + esc(p.id) + '">' +
+            '<td><div class="st-cell-title">' + TB.mediaBox(p, { small: true }) + '<span><strong><a href="' + editHref + '">' + esc(p.title) + '</a>' +
+            (p.isFeatured ? '<span class="st-flag" title="Featured">' + icon('star') + '</span>' : '') + '</strong>' +
+            '<span class="st-cell-sub">/' + esc(p.slug) + '</span></span></div></td>' +
+            '<td class="st-cell-muted">' + esc(catName(p.categoryId) || '—') + '</td>' +
+            '<td>' + studio.badge(p.status) + '</td>' +
+            '<td class="st-num">' + fmt.count(p.views) + '</td>' +
+            '<td class="st-cell-muted">' + esc(dateLabel) + '</td>' +
+            '<td class="st-actions-col"><span class="st-row-actions">' +
+            '<a class="st-icon-btn" href="' + editHref + '" title="Edit" aria-label="Edit ' + esc(p.title) + '">' + icon('edit') + '</a>' +
+            (p.status === 'published' && p.slug ? '<a class="st-icon-btn" href="' + esc(url.post(p.slug)) + '" target="_blank" rel="noopener" title="View on site" aria-label="View ' + esc(p.title) + '">' + icon('external') + '</a>' : '') +
+            '<button class="st-icon-btn st-icon-btn--danger" type="button" data-delete title="Delete" aria-label="Delete ' + esc(p.title) + '">' + icon('trash') + '</button>' +
+            '</span></td></tr>';
+    }
+
+    function render() {
+        renderTabs();
+        const list = filtered();
+        const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+        if (st.page > pages) st.page = pages;
+        const slice = list.slice((st.page - 1) * PER_PAGE, st.page * PER_PAGE);
+        rowsEl.innerHTML = slice.length ? slice.map(row).join('')
+            : studio.emptyRow(6, posts.length ? 'No posts match these filters' : 'No posts yet', posts.length ? 'Try another status, category or search.' : 'Create your first story with the New post button.');
+        $('#stPostInfo').textContent = list.length ? 'Showing ' + ((st.page - 1) * PER_PAGE + 1) + '–' + ((st.page - 1) * PER_PAGE + slice.length) + ' of ' + list.length : '';
+        $('#stPostPager').innerHTML = TB.pager(st.page, pages);
+        $('#stPostsSub').textContent = fmt.plural(posts.length, 'post') + ' · ' + posts.filter((p) => p.status === 'published').length + ' published';
+    }
+
+    async function load() {
+        rowsEl.innerHTML = studio.skeletonRows(6, 6);
+        try {
+            const res = await Promise.all([studio.list('blogs/posts'), studio.categories().catch(() => [])]);
+            cats = res[1];
+            posts = res[0].map((p) => Object.assign(TB.normalizePost(p), { updated: p.updatedAt || p.createdAt || '' }));
+            $('#stPostCat').innerHTML = '<option value="">All categories</option>' + cats.map((c) => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('');
+            render();
+        } catch (err) {
+            rowsEl.innerHTML = '<tr class="st-table__empty"><td colspan="6">' + TB.state('error', 'Unable to load posts', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    $('#stStatusTabs').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-status]');
+        if (!b) return;
+        st.status = b.dataset.status;
+        st.page = 1;
+        render();
+    });
+    $('#stPostSearch').addEventListener('input', TB.debounce((e) => { st.q = e.target.value.trim(); st.page = 1; render(); }, 200));
+    $('#stPostCat').addEventListener('change', (e) => { st.cat = e.target.value; st.page = 1; render(); });
+    $('#stPostSort').addEventListener('change', (e) => { st.sort = e.target.value; render(); });
+    $('#stPostPager').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-page]');
+        if (!b || b.disabled) return;
+        st.page = parseInt(b.dataset.page, 10) || 1;
+        render();
+    });
+
+    rowsEl.addEventListener('click', async (e) => {
+        const del = e.target.closest('[data-delete]');
+        if (!del) return;
+        const tr = del.closest('tr');
+        const post = posts.find((p) => p.id === tr.dataset.id);
+        if (!post) return;
+        const ok = await studio.confirm({
+            title: 'Delete “' + post.title + '”?',
+            text: 'This permanently removes the post, its comments, reactions and uploaded media. This cannot be undone.',
+            confirmLabel: 'Delete post',
+            danger: true
+        });
+        if (!ok) return;
+        try {
+            await api.del('blogs/posts/' + encodeURIComponent(post.id));
+            posts = posts.filter((p) => p !== post);
+            render();
+            TB.toast('Post deleted', 'success');
+        } catch (err) {
+            TB.toast(studio.explain(err), 'error');
+        }
+    });
+
+    load();
+});
+</script>

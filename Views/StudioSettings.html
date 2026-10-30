@@ -1,0 +1,134 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">Blog settings</h1>
+        <p class="st-head__sub">Key/value settings stored by MdBlog. For example, <code>blog_menu</code> sets the label of the blog's parent menu.</p>
+    </div>
+</div>
+
+<div class="st-grid st-grid--2">
+    <section class="st-card st-card--flush">
+        <div class="st-table-wrap">
+            <table class="st-table">
+                <thead><tr><th>Key</th><th>Value</th><th>Status</th><th class="st-actions-col"><span class="tb-sr">Actions</span></th></tr></thead>
+                <tbody id="stSetRows"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="st-card">
+        <div class="st-card__head">
+            <div>
+                <h2 class="st-card__title">Add a setting</h2>
+                <p class="st-card__sub">Use lowercase keys with underscores.</p>
+            </div>
+        </div>
+        <form class="st-form" id="stSetForm" novalidate>
+            <div class="tb-field">
+                <label class="tb-label" for="stSetKey">Key</label>
+                <input class="tb-input" id="stSetKey" maxlength="100" placeholder="posts_per_page" spellcheck="false" required>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="stSetValue">Value</label>
+                <textarea class="tb-textarea" id="stSetValue" rows="3" placeholder="12"></textarea>
+            </div>
+            <button class="tb-btn tb-btn--accent" type="submit" id="stSetAdd">Add setting</button>
+        </form>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, esc, plain, icon, api, studio } = TB;
+
+    studio.setTitle('Blog settings');
+    const rowsEl = $('#stSetRows');
+    let settings = [];
+
+    function row(s) {
+        const active = s.status !== 'isNotActive';
+        return '<tr data-id="' + esc(s.id) + '">' +
+            '<td><code>' + esc(s.key) + '</code></td>' +
+            '<td style="min-width:220px"><div class="st-field-inline"><input class="tb-input" data-value value="' + esc(s.value) + '" aria-label="Value for ' + esc(s.key) + '" style="min-height:38px;font-size:.88rem">' +
+            '<button class="tb-btn tb-btn--ghost tb-btn--sm" type="button" data-save>Save</button></div></td>' +
+            '<td>' + studio.badge(active ? 'isActive' : 'isNotActive') + '</td>' +
+            '<td class="st-actions-col"><span class="st-row-actions">' +
+            '<button class="st-icon-btn' + (active ? '' : ' st-icon-btn--good') + '" type="button" data-toggle title="' + (active ? 'Deactivate' : 'Activate') + '" aria-label="' + (active ? 'Deactivate ' : 'Activate ') + esc(s.key) + '">' + icon(active ? 'eye' : 'check') + '</button>' +
+            '<button class="st-icon-btn st-icon-btn--danger" type="button" data-delete title="Delete" aria-label="Delete ' + esc(s.key) + '">' + icon('trash') + '</button>' +
+            '</span></td></tr>';
+    }
+
+    async function load() {
+        rowsEl.innerHTML = studio.skeletonRows(4, 3);
+        try {
+            settings = (await studio.list('blogs/settings')).map((s) => ({
+                id: String(s.ltId), key: plain(s.settingKey || s.settingName || ''), value: plain(s.settingValue == null ? '' : s.settingValue), status: s.status || 'isActive'
+            }));
+            rowsEl.innerHTML = settings.length ? settings.map(row).join('') : studio.emptyRow(4, 'No settings yet', 'Add a key and value with the form.');
+        } catch (err) {
+            rowsEl.innerHTML = '<tr class="st-table__empty"><td colspan="4">' + TB.state('error', 'Unable to load settings', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    $('#stSetForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const key = $('#stSetKey').value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+        const value = $('#stSetValue').value.trim();
+        if (!key) { $('#stSetKey').focus(); TB.toast('Enter a key.', 'error'); return; }
+        await studio.busy($('#stSetAdd'), 'Adding…', async () => {
+            try {
+                await api.post('blogs/settings', { settingName: key, settingValue: value });
+                e.target.reset();
+                TB.toast('Setting added', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        });
+    });
+
+    rowsEl.addEventListener('click', async (e) => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const s = settings.find((x) => x.id === tr.dataset.id);
+        if (!s) return;
+        if (e.target.closest('[data-save]')) {
+            const value = tr.querySelector('[data-value]').value.trim();
+            await studio.busy(e.target.closest('[data-save]'), 'Saving', async () => {
+                try {
+                    await api.patch('blogs/settings/' + encodeURIComponent(s.id), { settingValue: value });
+                    s.value = value;
+                    TB.toast('Setting saved', 'success');
+                } catch (err) { TB.toast(studio.explain(err), 'error'); }
+            });
+            return;
+        }
+        if (e.target.closest('[data-toggle]')) {
+            try {
+                await api.patch('blogs/settings/' + encodeURIComponent(s.id) + '/toggle-active');
+                TB.toast(s.status === 'isNotActive' ? 'Setting activated' : 'Setting deactivated', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+            return;
+        }
+        if (e.target.closest('[data-delete]')) {
+            const ok = await studio.confirm({ title: 'Delete “' + s.key + '”?', text: 'MdBlog falls back to its defaults for this key.', confirmLabel: 'Delete setting', danger: true });
+            if (!ok) return;
+            try {
+                await api.del('blogs/settings/' + encodeURIComponent(s.id));
+                TB.toast('Setting deleted', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        }
+    });
+
+    rowsEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.matches('[data-value]')) {
+            e.preventDefault();
+            e.target.closest('tr').querySelector('[data-save]').click();
+        }
+    });
+
+    load();
+});
+</script>

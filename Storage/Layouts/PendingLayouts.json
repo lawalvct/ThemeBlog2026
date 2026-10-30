@@ -1,0 +1,12 @@
+[
+    { "layoutName": "StudioAuthLayout.html", "contentName": "StudioLogin.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioDashboard.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioPosts.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioEditor.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioCategories.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioTags.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioComments.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioReports.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioSettings.html", "layoutPackageName": "ThemeBlog2026" },
+    { "layoutName": "StudioLayout.html", "contentName": "StudioProfile.html", "layoutPackageName": "ThemeBlog2026" }
+]

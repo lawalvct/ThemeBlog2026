@@ -1,0 +1,166 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">Comments</h1>
+        <p class="st-head__sub" id="stComSub">Approve, mark as spam or remove reader comments.</p>
+    </div>
+    <div class="st-head__actions">
+        <button class="tb-btn tb-btn--ghost" type="button" id="stComRefresh">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Refresh
+        </button>
+    </div>
+</div>
+
+<section class="st-card st-card--flush">
+    <div class="st-toolbar">
+        <div class="st-tabs" role="tablist" aria-label="Filter by status" id="stComTabs"></div>
+        <div class="st-toolbar__spacer"></div>
+        <div class="st-toolbar__search">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <label class="tb-sr" for="stComSearch">Search comments</label>
+            <input class="tb-input" id="stComSearch" type="search" placeholder="Search text, author or post…">
+        </div>
+    </div>
+    <div class="st-table-wrap">
+        <table class="st-table">
+            <thead><tr><th>Comment</th><th>On post</th><th>Status</th><th class="st-num">Likes</th><th>Date</th><th class="st-actions-col"><span class="tb-sr">Actions</span></th></tr></thead>
+            <tbody id="stComRows"></tbody>
+        </table>
+    </div>
+    <div class="st-table-foot">
+        <span id="stComInfo"></span>
+        <nav class="tb-pager" id="stComPager" aria-label="Pagination"></nav>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, esc, plain, fmt, icon, api, url, studio } = TB;
+
+    studio.setTitle('Comments');
+    const PER_PAGE = 20;
+    const TABS = [['all', 'All'], ['pending', 'Pending'], ['approved', 'Approved'], ['spam', 'Spam']];
+    const rowsEl = $('#stComRows');
+    let comments = [];
+    const st = { status: 'all', q: '', page: 1 };
+
+    function flatten(list, parent, out) {
+        (list || []).forEach((c) => {
+            out.push({
+                id: String(c.ltId), postId: String(c.postId || ''), parentId: c.parentId ? String(c.parentId) : '',
+                parentAuthor: parent ? plain(parent.commentedBy || parent.author) : '',
+                author: plain(c.commentedBy || c.author) || 'Reader', body: plain(c.body), status: c.status || 'approved',
+                likes: Number(c.likes) || 0, created: c.createdAt || '', postTitle: plain(c.title || ''), postSlug: c.postSlug || '',
+                replies: Array.isArray(c.replies) ? c.replies.length : 0
+            });
+            flatten(c.replies, c, out);
+        });
+        return out;
+    }
+
+    function renderTabs() {
+        $('#stComTabs').innerHTML = TABS.map((t) => {
+            const n = t[0] === 'all' ? comments.length : comments.filter((c) => c.status === t[0]).length;
+            return '<button class="st-tab" role="tab" type="button" data-status="' + t[0] + '" aria-selected="' + (st.status === t[0]) + '">' + t[1] + ' <span class="st-tab__count">' + n + '</span></button>';
+        }).join('');
+    }
+
+    function row(c) {
+        const actions = [];
+        if (c.status !== 'approved') actions.push('<button class="st-icon-btn st-icon-btn--good" type="button" data-status-to="approved" title="Approve" aria-label="Approve comment">' + icon('check') + '</button>');
+        if (c.status !== 'spam') actions.push('<button class="st-icon-btn" type="button" data-status-to="spam" title="Mark as spam" aria-label="Mark comment as spam">' + icon('flag') + '</button>');
+        if (c.status === 'approved') actions.push('<button class="st-icon-btn" type="button" data-status-to="pending" title="Unapprove" aria-label="Move comment back to pending">' + icon('clock') + '</button>');
+        actions.push('<button class="st-icon-btn st-icon-btn--danger" type="button" data-delete title="Delete" aria-label="Delete comment">' + icon('trash') + '</button>');
+        return '<tr data-id="' + esc(c.id) + '">' +
+            '<td><div class="st-cell-title" style="align-items:flex-start;min-width:280px">' + TB.avatar(c.author, '', 34) +
+            '<span><strong>' + esc(c.author) + '</strong>' + (c.parentAuthor ? '<span class="st-cell-sub">↳ Reply to ' + esc(c.parentAuthor) + '</span>' : '') +
+            '<span class="st-cell-body" style="display:block;margin-top:4px">' + esc(c.body) + '</span></span></div></td>' +
+            '<td class="st-cell-muted" style="white-space:normal;min-width:160px">' + (c.postSlug ? '<a href="' + esc(url.post(c.postSlug)) + '#tbComments" target="_blank" rel="noopener">' + esc(c.postTitle || c.postSlug) + '</a>' : esc(c.postTitle || '—')) + '</td>' +
+            '<td>' + studio.badge(c.status) + '</td>' +
+            '<td class="st-num">' + fmt.count(c.likes) + '</td>' +
+            '<td class="st-cell-muted" title="' + esc(fmt.date(c.created)) + '">' + esc(fmt.ago(c.created) || '—') + '</td>' +
+            '<td class="st-actions-col"><span class="st-row-actions">' + actions.join('') + '</span></td></tr>';
+    }
+
+    function render() {
+        renderTabs();
+        const q = st.q.toLowerCase();
+        const list = comments.filter((c) => (st.status === 'all' || c.status === st.status) &&
+            (!q || (c.body + ' ' + c.author + ' ' + c.postTitle).toLowerCase().indexOf(q) !== -1));
+        const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+        if (st.page > pages) st.page = pages;
+        const slice = list.slice((st.page - 1) * PER_PAGE, st.page * PER_PAGE);
+        rowsEl.innerHTML = slice.length ? slice.map(row).join('')
+            : studio.emptyRow(6, comments.length ? 'Nothing here' : 'No comments yet', comments.length ? 'No comments match this filter.' : 'Reader comments will appear here for moderation.');
+        $('#stComInfo').textContent = list.length ? fmt.plural(list.length, 'comment') : '';
+        $('#stComPager').innerHTML = TB.pager(st.page, pages);
+        const pending = comments.filter((c) => c.status === 'pending').length;
+        $('#stComSub').textContent = pending ? pending + ' comment' + (pending === 1 ? ' is' : 's are') + ' waiting for review.' : 'Approve, mark as spam or remove reader comments.';
+    }
+
+    async function load() {
+        rowsEl.innerHTML = studio.skeletonRows(6, 6);
+        try {
+            comments = flatten(await studio.list('blogs/comments'), null, []);
+            comments.sort((a, b) => String(b.created).localeCompare(String(a.created)));
+            render();
+        } catch (err) {
+            rowsEl.innerHTML = '<tr class="st-table__empty"><td colspan="6">' + TB.state('error', 'Unable to load comments', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    $('#stComTabs').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-status]');
+        if (!b) return;
+        st.status = b.dataset.status;
+        st.page = 1;
+        render();
+    });
+    $('#stComSearch').addEventListener('input', TB.debounce((e) => { st.q = e.target.value.trim(); st.page = 1; render(); }, 200));
+    $('#stComPager').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-page]');
+        if (!b || b.disabled) return;
+        st.page = parseInt(b.dataset.page, 10) || 1;
+        render();
+    });
+    $('#stComRefresh').addEventListener('click', load);
+
+    rowsEl.addEventListener('click', async (e) => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const c = comments.find((x) => x.id === tr.dataset.id);
+        if (!c) return;
+
+        const to = e.target.closest('[data-status-to]');
+        if (to) {
+            const status = to.dataset.statusTo;
+            try {
+                await api.post('blogs/comments/update-status', { ltId: c.id, status: status });
+                c.status = status;
+                render();
+                TB.toast('Comment marked as ' + studio.statusLabel(status).toLowerCase(), 'success');
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+            return;
+        }
+
+        if (e.target.closest('[data-delete]')) {
+            const ok = await studio.confirm({
+                title: 'Delete this comment?',
+                text: c.replies ? 'Its ' + c.replies + (c.replies === 1 ? ' reply' : ' replies') + ' will be deleted too.' : 'This cannot be undone.',
+                confirmLabel: 'Delete comment',
+                danger: true
+            });
+            if (!ok) return;
+            try {
+                await api.del('blogs/comments/' + encodeURIComponent(c.id));
+                TB.toast('Comment deleted', 'success');
+                load();
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        }
+    });
+
+    load();
+});
+</script>

@@ -1,0 +1,143 @@
+<?php
+    $tbFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+    // Works with ?id=… and with a pretty page route such as /author/{id}.
+    $tbAuthorId = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+?>
+<section class="tb-container tb-profile" id="tbProfile" aria-busy="true">
+    <div class="tb-profile__inner">
+        <div class="tb-skel" style="width:clamp(96px,14vw,148px);height:clamp(96px,14vw,148px);border-radius:50%"></div>
+        <div style="display:grid;gap:12px;width:100%">
+            <div class="tb-skel" style="height:48px;width:min(420px,80%)"></div>
+            <div class="tb-skel tb-skel--line" style="width:140px"></div>
+            <div class="tb-skel tb-skel--line" style="width:min(560px,90%)"></div>
+        </div>
+    </div>
+</section>
+
+<section class="tb-container" id="tbAuthorPostsSection" hidden>
+    <header class="tb-section-head">
+        <h2 class="tb-section-head__title" id="tbAuthorPostsTitle">Stories</h2>
+        <label class="tb-toolbar__sort" style="flex:0 0 200px">
+            <span class="tb-sr">Sort stories</span>
+            <select class="tb-select" id="tbAuthorSort">
+                <option value="latest">Newest first</option>
+                <option value="popular">Most read</option>
+                <option value="liked">Most liked</option>
+            </select>
+        </label>
+    </header>
+    <div class="tb-grid tb-grid--3" id="tbAuthorGrid"></div>
+    <div style="display:flex;justify-content:center;margin-top:44px">
+        <button class="tb-btn tb-btn--ghost" type="button" id="tbAuthorMore" hidden>Load more stories</button>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB) return;
+    const { $, esc, plain, url, data, card, avatar, icon, fmt, state, normalizePost } = TB;
+
+    const ID = TB.param('id', <?= json_encode($tbAuthorId, $tbFlags) ?>);
+    const PAGE = 9;
+    let posts = [];
+    let shown = 0;
+
+    function fail(title, text) {
+        const el = $('#tbProfile');
+        el.removeAttribute('aria-busy');
+        el.innerHTML = state('empty', title, text, { href: url.blog(), label: 'Browse all stories' });
+    }
+
+    function socialUrl(kind, value) {
+        const v = String(value || '').trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) return v;
+        const handle = v.replace(/^@/, '');
+        return { twitter: 'https://x.com/', linkedin: 'https://www.linkedin.com/in/', facebook: 'https://www.facebook.com/' }[kind] + encodeURIComponent(handle);
+    }
+
+    function sortPosts(kind) {
+        const by = {
+            latest: (a, b) => String(b.date).localeCompare(String(a.date)),
+            popular: (a, b) => b.views - a.views,
+            liked: (a, b) => b.likes - a.likes
+        }[kind] || (() => 0);
+        posts.sort(by);
+    }
+
+    function renderMore() {
+        const next = posts.slice(shown, shown + PAGE);
+        $('#tbAuthorGrid').insertAdjacentHTML('beforeend', next.map((p, i) => card.standard(p, { index: i % 6, meta: ['date', 'read', 'views'] })).join(''));
+        shown += next.length;
+        $('#tbAuthorMore').hidden = shown >= posts.length;
+    }
+
+    function resetGrid() {
+        shown = 0;
+        $('#tbAuthorGrid').innerHTML = '';
+        renderMore();
+    }
+
+    (async function load() {
+        if (!ID) return fail('No author selected', 'Open an author from any story byline.');
+        let record;
+        let cats = [];
+        try {
+            const res = await Promise.all([data.author(ID), data.categories().catch(() => [])]);
+            record = res[0];
+            cats = res[1];
+        } catch (err) {
+            return fail(/no user/i.test(err.message) ? 'Author not found' : 'Unable to load this author', err.message);
+        }
+        if (!record) return fail('Author not found', 'This profile may have been removed.');
+
+        const name = plain(record.fullname) || plain(record.username) || 'Anonymous author';
+        const catName = (id) => { const c = cats.find((x) => x.id === String(id)); return c ? c.name : ''; };
+        posts = (Array.isArray(record.posts) ? record.posts : [])
+            .map(normalizePost)
+            .filter((p) => p && p.slug && String(p.status).toLowerCase() === 'published')
+            .map((p) => Object.assign(p, { author: name, authorId: String(ID), category: p.category || catName(p.categoryId) }));
+        sortPosts('latest');
+
+        const views = posts.reduce((n, p) => n + p.views, 0);
+        const likes = posts.reduce((n, p) => n + p.likes, 0);
+        const links = [['twitter', 'brandX', 'X'], ['linkedin', 'linkedin', 'LinkedIn'], ['facebook', 'facebook', 'Facebook']]
+            .map((s) => { const href = socialUrl(s[0], record[s[0]]); return href ? '<a class="tb-icon-btn" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" aria-label="' + s[2] + '">' + icon(s[1]) + '</a>' : ''; })
+            .join('');
+        const metaBits = [];
+        if (record.location) metaBits.push('<span>' + icon('mapPin') + esc(plain(record.location)) + '</span>');
+        if (record.joined) metaBits.push('<span>' + icon('calendar') + 'Joined ' + esc(fmt.date(record.joined)) + '</span>');
+
+        const el = $('#tbProfile');
+        el.removeAttribute('aria-busy');
+        el.innerHTML = '<nav class="tb-crumbs" aria-label="Breadcrumb" style="margin-bottom:28px"><a href="' + esc(url.home()) + '">Home</a>' + icon('chevronRight') + '<span>Authors</span>' + icon('chevronRight') + '<span>' + esc(name) + '</span></nav>' +
+            '<div class="tb-profile__inner">' + avatar(name, url.media(record.avatar)) +
+            '<div><span class="tb-kicker">Author</span>' +
+            '<h1 class="tb-profile__name" style="margin-top:10px">' + esc(name) + '</h1>' +
+            (record.username ? '<p class="tb-profile__handle">@' + esc(plain(record.username)) + '</p>' : '') +
+            (record.bio ? '<p class="tb-profile__bio">' + esc(plain(record.bio)) + '</p>' : '') +
+            (metaBits.length ? '<div class="tb-profile__meta">' + metaBits.join('') + '</div>' : '') +
+            (links ? '<div class="tb-profile__links">' + links + '</div>' : '') +
+            '</div></div>' +
+            '<div class="tb-stats">' +
+            '<div class="tb-stat"><div class="tb-stat__value">' + fmt.count(posts.length) + '</div><div class="tb-stat__label">' + (posts.length === 1 ? 'Story' : 'Stories') + '</div></div>' +
+            '<div class="tb-stat"><div class="tb-stat__value">' + fmt.count(views) + '</div><div class="tb-stat__label">Reads</div></div>' +
+            '<div class="tb-stat"><div class="tb-stat__value">' + fmt.count(likes) + '</div><div class="tb-stat__label">Likes</div></div>' +
+            '</div>';
+        document.title = name + ' — ' + (TB.config.siteName || '');
+
+        $('#tbAuthorPostsTitle').innerHTML = 'Stories by <em>' + esc(name.split(' ')[0]) + '</em>';
+        $('#tbAuthorPostsSection').hidden = false;
+        if (!posts.length) {
+            $('#tbAuthorGrid').innerHTML = state('empty', 'No published stories yet', name + ' has not published anything here yet.');
+            $('#tbAuthorSort').closest('label').hidden = true;
+            return;
+        }
+        resetGrid();
+        $('#tbAuthorMore').addEventListener('click', renderMore);
+        $('#tbAuthorSort').addEventListener('change', (e) => { sortPosts(e.target.value); resetGrid(); });
+    })();
+});
+</script>

@@ -1,0 +1,554 @@
+<?php
+    $tbFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+    $tbPostId = isset($_GET['id']) ? trim((string) $_GET['id']) : '';
+?>
+<!-- Quill 1.3.7 matches MdBlog's own editor, so posts stay editable in both places. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+
+<form id="stEditorForm" novalidate>
+    <div class="st-head">
+        <div>
+            <a class="tb-more-link" id="stBack" href="#" style="font-size:.82rem;color:var(--tb-muted)">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> All posts
+            </a>
+            <h1 class="st-head__title" id="stEditorTitle" style="margin-top:8px">New post</h1>
+            <p class="st-head__sub" id="stEditorSub">Not saved yet</p>
+        </div>
+        <div class="st-head__actions">
+            <a class="tb-btn tb-btn--ghost" id="stPreview" href="#" target="_blank" rel="noopener" hidden>
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg> View
+            </a>
+            <button class="tb-btn tb-btn--ghost" type="button" id="stSaveDraft">Save draft</button>
+            <button class="tb-btn tb-btn--accent" type="submit" id="stPrimary">Publish</button>
+        </div>
+    </div>
+
+    <div class="st-notice" id="stEditorNotice" role="alert" hidden style="margin-bottom:18px"></div>
+
+    <div class="st-editor" id="stEditorBody">
+        <div class="st-editor__main">
+            <div class="st-card">
+                <label class="tb-sr" for="stTitle">Title</label>
+                <textarea class="st-title-input" id="stTitle" rows="1" maxlength="255" placeholder="Give your story a title"></textarea>
+                <div class="st-slug">
+                    <label for="stSlug">Slug</label>
+                    <input id="stSlug" type="text" maxlength="200" spellcheck="false" placeholder="generated-from-title">
+                    <button class="st-icon-btn" type="button" id="stSlugReset" title="Regenerate from title" aria-label="Regenerate slug from title">
+                        <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="st-quill"><div id="stQuill"></div></div>
+            <div class="st-editor__stats" aria-live="polite">
+                <span id="stWords">0 words</span><span id="stReadEst">1 min read</span><span id="stDirty"></span>
+            </div>
+
+            <div class="st-card">
+                <div class="tb-field">
+                    <label class="tb-label" for="stExcerpt">Excerpt</label>
+                    <textarea class="tb-textarea" id="stExcerpt" rows="3" maxlength="400" placeholder="One or two sentences shown on story cards, in search and as the article subtitle."></textarea>
+                    <span class="st-hint st-hint--count" data-count-for="stExcerpt" data-max="300"></span>
+                </div>
+            </div>
+        </div>
+
+        <aside class="st-editor__side">
+            <section class="st-panel">
+                <p class="st-panel__title">Publishing</p>
+                <div class="tb-field">
+                    <label class="tb-label" for="stStatus">Status</label>
+                    <select class="tb-select" id="stStatus">
+                        <option value="draft">Draft</option>
+                        <option value="pending">Pending review</option>
+                        <option value="published">Published</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="private">Private</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stPublishedAt">Publish date</label>
+                    <input class="tb-input" id="stPublishedAt" type="datetime-local">
+                    <span class="st-hint">Leave empty to use the moment you publish.</span>
+                </div>
+                <div style="margin-top:10px">
+                    <label class="st-switch"><span class="st-switch__text"><strong>Featured</strong><small>Lead story on the home page</small></span><input type="checkbox" id="stFeatured"><span class="st-switch__ui"></span></label>
+                    <label class="st-switch"><span class="st-switch__text"><strong>Show in menus</strong><small>List under its category in navigation</small></span><input type="checkbox" id="stShowOnMenu" checked><span class="st-switch__ui"></span></label>
+                    <label class="st-switch"><span class="st-switch__text"><strong>Allow comments</strong><small>Readers can join the conversation</small></span><input type="checkbox" id="stAllowComments" checked><span class="st-switch__ui"></span></label>
+                </div>
+                <button class="tb-btn tb-btn--ghost tb-btn--block st-btn-delete" type="button" id="stDelete" hidden style="margin-top:12px;color:var(--tb-danger)">
+                    <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg> Delete post
+                </button>
+            </section>
+
+            <section class="st-panel">
+                <p class="st-panel__title">Organise</p>
+                <div class="tb-field">
+                    <label class="tb-label" for="stCategory">Category</label>
+                    <select class="tb-select" id="stCategory"><option value="">Choose a category…</option></select>
+                    <a class="st-hint" id="stManageCats" href="#" style="color:var(--tb-accent);font-weight:600">Manage categories</a>
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stReading">Reading time (minutes)</label>
+                    <input class="tb-input" id="stReading" type="number" min="1" max="600" value="1">
+                    <span class="st-hint">Calculated from the word count until you change it.</span>
+                </div>
+            </section>
+
+            <section class="st-panel">
+                <p class="st-panel__title">Cover &amp; gallery</p>
+                <label class="st-drop" id="stDrop" for="stFiles">
+                    <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>
+                    <span><strong>Click to upload</strong> or drag files here</span>
+                    <span>Images, video, audio or PDF · the first image is the cover</span>
+                </label>
+                <input id="stFiles" type="file" multiple accept="image/*,video/*,audio/*,application/pdf" hidden>
+                <div class="st-media-grid" id="stMediaGrid"></div>
+            </section>
+
+            <section class="st-panel">
+                <p class="st-panel__title">Search appearance</p>
+                <div class="tb-field">
+                    <label class="tb-label" for="stSeoTitle">SEO title</label>
+                    <input class="tb-input" id="stSeoTitle" type="text" maxlength="255" placeholder="Defaults to the post title">
+                    <span class="st-hint st-hint--count" data-count-for="stSeoTitle" data-max="60"></span>
+                </div>
+                <div class="tb-field">
+                    <label class="tb-label" for="stSeoDesc">Meta description</label>
+                    <textarea class="tb-textarea" id="stSeoDesc" rows="3" maxlength="400" placeholder="Defaults to the excerpt"></textarea>
+                    <span class="st-hint st-hint--count" data-count-for="stSeoDesc" data-max="160"></span>
+                </div>
+                <div class="st-serp" aria-label="Search result preview">
+                    <div class="st-serp__url" id="stSerpUrl"></div>
+                    <div class="st-serp__title" id="stSerpTitle">Post title</div>
+                    <div class="st-serp__desc" id="stSerpDesc">Your excerpt or meta description appears here.</div>
+                </div>
+            </section>
+        </aside>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, $$, esc, plain, fmt, icon, api, auth, url, studio } = TB;
+
+    let postId = TB.param('id', <?= json_encode($tbPostId, $tbFlags) ?>);
+    let post = null;               // last loaded server copy
+    let existingMedia = [];        // media already on the server
+    let deletedMedia = [];         // mediaIds to remove on save
+    let newFiles = [];             // File objects to upload on save
+    let slugTouched = false;
+    let readingTouched = false;
+    let dirty = false;
+    let ready = false;
+
+    const el = {
+        form: $('#stEditorForm'), title: $('#stTitle'), slug: $('#stSlug'), excerpt: $('#stExcerpt'),
+        status: $('#stStatus'), publishedAt: $('#stPublishedAt'), featured: $('#stFeatured'),
+        showOnMenu: $('#stShowOnMenu'), allowComments: $('#stAllowComments'), category: $('#stCategory'),
+        reading: $('#stReading'), seoTitle: $('#stSeoTitle'), seoDesc: $('#stSeoDesc'),
+        primary: $('#stPrimary'), draft: $('#stSaveDraft'), notice: $('#stEditorNotice'), media: $('#stMediaGrid')
+    };
+
+    $('#stBack').href = studio.url('Posts');
+    $('#stManageCats').href = studio.url('Categories');
+
+    if (typeof window.Quill !== 'function') {
+        el.notice.innerHTML = icon('alert') + '<span>The text editor could not be loaded. Check your internet connection (Quill is loaded from cdn.jsdelivr.net) and reload the page.</span>';
+        el.notice.hidden = false;
+        return;
+    }
+
+    /* ---------- Quill ---------- */
+    // Downscale large images before they are embedded; MdBlog stores them as files on save.
+    function imageHandler() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    const max = 1600;
+                    const scale = Math.min(1, max / Math.max(img.width, img.height));
+                    let data = reader.result;
+                    if (scale < 1 || file.size > 600 * 1024) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.width * scale);
+                        canvas.height = Math.round(img.height * scale);
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        data = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.86);
+                    }
+                    const range = quill.getSelection(true);
+                    quill.insertEmbed(range ? range.index : quill.getLength(), 'image', data, 'user');
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    }
+
+    const quill = new window.Quill('#stQuill', {
+        theme: 'snow',
+        placeholder: 'Tell your story…',
+        modules: {
+            clipboard: { matchVisual: false },
+            toolbar: {
+                container: [
+                    [{ header: [2, 3, 4, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    ['blockquote', 'code-block'],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['link', 'image', 'video'],
+                    [{ align: [] }],
+                    ['clean']
+                ],
+                handlers: { image: imageHandler }
+            }
+        }
+    });
+
+    function contentHtml() {
+        const hasMedia = quill.root.querySelector('img, iframe, video');
+        return quill.getText().trim() || hasMedia ? quill.root.innerHTML : '';
+    }
+
+    function wordCount() {
+        const text = quill.getText().trim();
+        return text ? text.split(/\s+/).length : 0;
+    }
+
+    /* ---------- helpers ---------- */
+    function markDirty() {
+        if (!ready) return;
+        dirty = true;
+        $('#stDirty').textContent = 'Unsaved changes';
+    }
+
+    function autoGrow() {
+        el.title.style.height = 'auto';
+        el.title.style.height = el.title.scrollHeight + 'px';
+    }
+
+    function updateCounts() {
+        $$('[data-count-for]').forEach((hint) => {
+            const input = document.getElementById(hint.dataset.countFor);
+            const max = Number(hint.dataset.max);
+            const n = input.value.length;
+            hint.textContent = n + ' / ' + max;
+            hint.classList.toggle('is-over', n > max);
+        });
+    }
+
+    function updateStats() {
+        const words = wordCount();
+        const est = Math.max(1, Math.round(words / 225));
+        $('#stWords').textContent = fmt.plural(words, 'word');
+        $('#stReadEst').textContent = est + ' min read';
+        if (!readingTouched) el.reading.value = est;
+    }
+
+    function updateSerp() {
+        const title = el.seoTitle.value.trim() || el.title.value.trim() || 'Post title';
+        const desc = el.seoDesc.value.trim() || el.excerpt.value.trim() || 'Your excerpt or meta description appears here.';
+        $('#stSerpUrl').textContent = url.post(el.slug.value.trim() || 'your-post').replace(/^https?:\/\//, '');
+        $('#stSerpTitle').textContent = title + ' — ' + (TB.config.siteName || '');
+        $('#stSerpDesc').textContent = desc;
+    }
+
+    function updatePrimaryLabel() {
+        const s = el.status.value;
+        const labels = { draft: 'Publish', published: post && post.status === 'published' ? 'Update' : 'Publish', scheduled: 'Schedule', pending: 'Submit for review', private: 'Save as private', archived: 'Archive' };
+        el.primary.textContent = labels[s] || 'Save';
+    }
+
+    function setHeader() {
+        const editing = !!postId;
+        $('#stEditorTitle').textContent = editing ? 'Edit post' : 'New post';
+        studio.setTitle(editing ? 'Edit post' : 'New post');
+        $('#stDelete').hidden = !editing;
+        const preview = $('#stPreview');
+        if (post && post.slug && post.status === 'published') { preview.href = url.post(post.slug); preview.hidden = false; } else preview.hidden = true;
+        $('#stEditorSub').innerHTML = post
+            ? studio.badge(post.status) + ' &nbsp;' + esc(post.updated ? 'Last saved ' + fmt.ago(post.updated) : '')
+            : 'Not saved yet';
+    }
+
+    /* ---------- media ---------- */
+    function renderMedia() {
+        const items = existingMedia.map((m) => ({ kind: 'existing', id: String(m.mediaId), name: m.originalName, type: m.mimeType || '', src: url.media(m.storagePath) }))
+            .concat(newFiles.map((f, i) => ({ kind: 'new', index: i, name: f.name, type: f.type || '', src: f._preview })));
+        const firstImage = items.findIndex((it) => it.type.indexOf('image/') === 0);
+        el.media.innerHTML = items.map((it, i) => {
+            const thumb = it.type.indexOf('image/') === 0 ? '<img src="' + esc(it.src) + '" alt="">'
+                : it.type.indexOf('video/') === 0 ? '<video src="' + esc(it.src) + '" muted preload="metadata"></video>'
+                : '<span class="st-media-item__file">' + icon(it.type.indexOf('audio/') === 0 ? 'music' : 'file') + '<br>' + esc(it.name) + '</span>';
+            const tag = i === firstImage ? '<span class="st-media-item__tag">Cover</span>' : (it.kind === 'new' ? '<span class="st-media-item__tag st-media-item__tag--new">New</span>' : '');
+            return '<div class="st-media-item" title="' + esc(it.name) + '">' + thumb + tag +
+                '<button class="st-media-item__remove" type="button" data-kind="' + it.kind + '" data-ref="' + esc(it.kind === 'new' ? it.index : it.id) + '" aria-label="Remove ' + esc(it.name) + '">' + icon('x') + '</button></div>';
+        }).join('');
+    }
+
+    function addFiles(list) {
+        Array.from(list || []).forEach((f) => {
+            if (f.size > 25 * 1024 * 1024) { TB.toast(f.name + ' is larger than 25 MB and was skipped.', 'error'); return; }
+            f._preview = URL.createObjectURL(f);
+            newFiles.push(f);
+        });
+        renderMedia();
+        markDirty();
+    }
+
+    $('#stFiles').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+    const drop = $('#stDrop');
+    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('is-over'); }));
+    drop.addEventListener('drop', (e) => addFiles(e.dataTransfer && e.dataTransfer.files));
+    el.media.addEventListener('click', (e) => {
+        const b = e.target.closest('.st-media-item__remove');
+        if (!b) return;
+        if (b.dataset.kind === 'new') {
+            const f = newFiles[Number(b.dataset.ref)];
+            if (f && f._preview) URL.revokeObjectURL(f._preview);
+            newFiles.splice(Number(b.dataset.ref), 1);
+        } else {
+            deletedMedia.push(b.dataset.ref);
+            existingMedia = existingMedia.filter((m) => String(m.mediaId) !== b.dataset.ref);
+        }
+        renderMedia();
+        markDirty();
+    });
+
+    /* ---------- load ---------- */
+    async function loadCategories(selected) {
+        try {
+            const cats = await studio.categories();
+            el.category.innerHTML = '<option value="">Choose a category…</option>' + cats.map((c) =>
+                '<option value="' + esc(c.id) + '"' + (c.id === String(selected || '') ? ' selected' : '') + '>' + esc(c.name) + (c.status === 'isNotActive' ? ' (inactive)' : '') + '</option>').join('');
+        } catch (e) {
+            el.category.innerHTML = '<option value="">Categories unavailable</option>';
+        }
+    }
+
+    function fill(p) {
+        post = p;
+        el.title.value = plain(p.title);
+        el.slug.value = p.slug || '';
+        slugTouched = true;
+        el.excerpt.value = plain(p.excerpt);
+        el.status.value = p.status || 'draft';
+        el.publishedAt.value = p.publishedAt ? studio.toLocalInput(p.publishedAt) : '';
+        el.featured.checked = Number(p.isFeatured) === 1;
+        el.showOnMenu.checked = p.showOnMenu == null ? true : Number(p.showOnMenu) === 1;
+        el.allowComments.checked = p.allowComments == null ? true : Number(p.allowComments) === 1;
+        el.seoTitle.value = plain(p.seoTitle || '');
+        el.seoDesc.value = plain(p.seoDescription || '');
+        if (p.readingTime) { el.reading.value = p.readingTime; readingTouched = true; }
+        quill.setContents([]);
+        quill.clipboard.dangerouslyPasteHTML(0, studio.contentForEditor(p.content, p.ltId));
+        existingMedia = Array.isArray(p.media) ? p.media.slice() : [];
+        deletedMedia = [];
+        newFiles.forEach((f) => f._preview && URL.revokeObjectURL(f._preview));
+        newFiles = [];
+        renderMedia();
+    }
+
+    async function loadPost() {
+        const rows = await studio.list('blogs/posts');
+        const found = rows.find((r) => String(r.ltId) === String(postId));
+        if (!found) return null;
+        found.updated = found.updatedAt || found.createdAt || '';
+        return found;
+    }
+
+    function refreshAll() {
+        autoGrow(); updateCounts(); updateStats(); updateSerp(); updatePrimaryLabel(); setHeader();
+    }
+
+    (async function init() {
+        studio.setTitle(postId ? 'Edit post' : 'New post');
+        if (postId) {
+            el.form.style.opacity = '.55';
+            try {
+                const p = await loadPost();
+                if (!p) {
+                    $('#stEditorBody').innerHTML = TB.state('empty', 'Post not found', 'It may have been deleted.', { href: studio.url('Posts'), label: 'Back to posts' });
+                    return;
+                }
+                await loadCategories(p.categoryId);
+                fill(p);
+            } catch (err) {
+                $('#stEditorBody').innerHTML = TB.state('error', 'Unable to load this post', studio.explain(err));
+                return;
+            } finally {
+                el.form.style.opacity = '';
+            }
+        } else {
+            await loadCategories('');
+            el.title.focus();
+        }
+        refreshAll();
+        ready = true;
+    })();
+
+    /* ---------- live behaviour ---------- */
+    el.title.addEventListener('input', () => {
+        autoGrow();
+        if (!slugTouched) el.slug.value = studio.slugify(el.title.value);
+        updateSerp();
+        markDirty();
+    });
+    el.slug.addEventListener('input', () => { slugTouched = true; updateSerp(); markDirty(); });
+    el.slug.addEventListener('blur', () => { el.slug.value = studio.slugify(el.slug.value); updateSerp(); });
+    $('#stSlugReset').addEventListener('click', () => { el.slug.value = studio.slugify(el.title.value); slugTouched = false; updateSerp(); markDirty(); });
+    el.reading.addEventListener('input', () => { readingTouched = true; markDirty(); });
+    el.status.addEventListener('change', () => { updatePrimaryLabel(); markDirty(); });
+    [el.excerpt, el.seoTitle, el.seoDesc].forEach((i) => i.addEventListener('input', () => { updateCounts(); updateSerp(); markDirty(); }));
+    [el.publishedAt, el.featured, el.showOnMenu, el.allowComments, el.category].forEach((i) => i.addEventListener('change', markDirty));
+    quill.on('text-change', (delta, old, source) => { updateStats(); if (source === 'user') markDirty(); });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (!dirty) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    /* ---------- save ---------- */
+    function showNotice(msg) {
+        let text = msg;
+        if (/doesn't have a default value/i.test(msg)) {
+            text += ' — this is a known MdBlog database issue (tb_blog_post has required fileSize/originalName/filename columns). Ask the module developer to give them defaults or drop them.';
+        }
+        if (/author_id/i.test(msg)) {
+            text += ' — the Studio could not tell the server who you are. Sign out and sign in again, then retry.';
+        }
+        el.notice.innerHTML = icon('alert') + '<span>' + esc(text) + '</span>';
+        el.notice.hidden = false;
+        el.notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function validate(status) {
+        const errors = [];
+        if (!el.title.value.trim()) errors.push('Add a title.');
+        if (!studio.slugify(el.slug.value || el.title.value)) errors.push('Add a slug.');
+        if (status !== 'draft' && !contentHtml()) errors.push('Write some content before publishing.');
+        if (status === 'published' || status === 'scheduled') {
+            if (!el.category.value) errors.push('Choose a category.');
+        }
+        if (status === 'scheduled') {
+            const when = el.publishedAt.value ? new Date(el.publishedAt.value) : null;
+            if (!when || when <= new Date()) errors.push('Pick a future publish date to schedule.');
+        }
+        return errors;
+    }
+
+    async function save(status) {
+        el.notice.hidden = true;
+        const errors = validate(status);
+        if (errors.length) { showNotice(errors.join(' ')); return; }
+
+        if (!el.slug.value.trim()) el.slug.value = studio.slugify(el.title.value);
+        el.slug.value = studio.slugify(el.slug.value);
+        const before = { status: el.status.value, publishedAt: el.publishedAt.value };
+        el.status.value = status;
+        if ((status === 'published' || status === 'scheduled') && !el.publishedAt.value) el.publishedAt.value = studio.toLocalInput();
+
+        const fd = new FormData();
+        fd.append('title', el.title.value.trim());
+        fd.append('slug', el.slug.value);
+        fd.append('categoryId', el.category.value);
+        fd.append('excerpt', el.excerpt.value.trim());
+        fd.append('content', contentHtml());
+        fd.append('readingTime', String(Math.max(1, parseInt(el.reading.value, 10) || 1)));
+        fd.append('seoTitle', el.seoTitle.value.trim());
+        fd.append('seoDescription', el.seoDesc.value.trim());
+        fd.append('status', status);
+        fd.append('isFeatured', el.featured.checked ? '1' : '0');
+        fd.append('showOnMenu', el.showOnMenu.checked ? '1' : '0');
+        // MdBlog maps allowComments straight onto the integer allow_comments column,
+        // so send 1/0 (a checkbox's 'on' is rejected by MySQL strict mode).
+        fd.append('allowComments', el.allowComments.checked ? '1' : '0');
+        if (el.publishedAt.value) fd.append('publishedAt', studio.fromLocalInput(el.publishedAt.value));
+        newFiles.forEach((f) => fd.append('additionalMedia[]', f, f.name));
+
+        let endpoint = 'blogs/posts';
+        if (!postId) {
+            // store() falls back to the PHP session for author_id; send the signed-in
+            // editor explicitly so new posts never fail on an empty session.
+            const me = auth.user() || {};
+            if (me.ltId) fd.append('author', String(me.ltId));
+        } else {
+            endpoint = 'blogs/posts/' + encodeURIComponent(postId);
+            fd.append('_method', 'PATCH');
+            fd.append('ltId', postId);
+            fd.append('deletedMedia', JSON.stringify(deletedMedia));
+        }
+
+        const btn = status === 'draft' ? el.draft : el.primary;
+        await studio.busy(btn, status === 'draft' ? 'Saving…' : 'Publishing…', async () => {
+            try {
+                const res = await api.form(endpoint, fd);
+                const created = !postId;
+                if (created) {
+                    const newId = res && (res.ltId || res.lt_id);
+                    if (!newId) { TB.toast('Post saved.', 'success'); dirty = false; window.location.href = studio.url('Posts'); return; }
+                    postId = String(newId);
+                    history.replaceState(null, '', studio.url('Editor', { id: postId }));
+                }
+                const fresh = await loadPost().catch(() => null);
+                if (fresh) fill(fresh);
+                dirty = false;
+                $('#stDirty').textContent = 'All changes saved';
+                refreshAll();
+                TB.toast(created ? 'Post created' : (status === 'published' ? 'Post updated' : 'Saved'), 'success');
+            } catch (err) {
+                // Nothing was saved: put the publishing controls back as they were.
+                el.status.value = before.status;
+                el.publishedAt.value = before.publishedAt;
+                updatePrimaryLabel();
+                showNotice(studio.explain(err));
+            }
+        });
+    }
+
+    el.form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        save(el.status.value === 'draft' ? 'published' : el.status.value);
+    });
+    el.draft.addEventListener('click', () => save('draft'));
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            save(el.status.value);
+        }
+    });
+
+    $('#stDelete').addEventListener('click', async () => {
+        if (!postId) return;
+        const ok = await studio.confirm({
+            title: 'Delete this post?',
+            text: 'The post, its comments, reactions and uploaded media will be removed permanently.',
+            confirmLabel: 'Delete post',
+            danger: true
+        });
+        if (!ok) return;
+        try {
+            await api.del('blogs/posts/' + encodeURIComponent(postId));
+            dirty = false;
+            TB.toast('Post deleted', 'success');
+            setTimeout(() => { window.location.href = studio.url('Posts'); }, 500);
+        } catch (err) {
+            showNotice(studio.explain(err));
+        }
+    });
+});
+</script>

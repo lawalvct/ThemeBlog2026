@@ -1,0 +1,118 @@
+<?php
+    // ThemeBlog2026 — sticky masthead, mobile drawer and search overlay.
+    // Renders once, and only when imported by a layout or by TopHeader's region mode.
+    $tbShowHeader = defined('TB_LAYOUT') && !defined('TB_HEADER_DONE');
+    if ($tbShowHeader) { define('TB_HEADER_DONE', true); }
+    $tbSite = rtrim(ltSiteUrl(), '/');
+    $tbName = ltSiteName();
+    $tbLogo = function_exists('ltSiteLogoUrl') ? ltSiteLogoUrl() : '';
+    $tbHome = $tbSite . '/ThemeBlog2026/Home';
+    $tbBlog = $tbSite . '/ThemeBlog2026/Blog';
+    $tbTopics = $tbSite . '/ThemeBlog2026/Topics';
+    $tbSignIn = $tbSite . '/MdBlog/Sign-in';
+    $tbE = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+?>
+<?php if ($tbShowHeader): ?>
+<header class="tb-header">
+    <div class="tb-container tb-header__inner">
+        <a class="tb-brand" href="<?= $tbE($tbHome) ?>" aria-label="<?= $tbE($tbName) ?> home">
+            <?php if ($tbLogo !== ''): ?>
+                <img class="tb-brand__logo" src="<?= $tbE($tbLogo) ?>" alt="" width="34" height="34">
+            <?php else: ?>
+                <span class="tb-brand__mark" aria-hidden="true"><?= $tbE(function_exists('mb_substr') ? mb_substr($tbName, 0, 1) : substr($tbName, 0, 1)) ?></span>
+            <?php endif; ?>
+            <span class="tb-brand__name"><?= $tbE($tbName) ?><span class="tb-brand__dot">.</span></span>
+        </a>
+
+        <nav class="tb-nav" aria-label="Main">
+            <a class="tb-nav__link" data-tb-nav href="<?= $tbE($tbHome) ?>">Home</a>
+            <a class="tb-nav__link" data-tb-nav href="<?= $tbE($tbBlog) ?>">Stories</a>
+            <div class="tb-dd">
+                <a class="tb-nav__link" data-tb-nav href="<?= $tbE($tbTopics) ?>" aria-haspopup="true" aria-expanded="false">
+                    Topics
+                    <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </a>
+                <div class="tb-dd__menu tb-dd__menu--wide" data-tb-topics-menu>
+                    <div class="tb-dd__heading">Loading topics…</div>
+                </div>
+            </div>
+            <div class="tb-dd" data-tb-more hidden>
+                <button class="tb-nav__link" type="button" aria-haspopup="true" aria-expanded="false">
+                    More
+                    <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="tb-dd__menu"></div>
+            </div>
+        </nav>
+
+        <div class="tb-header__actions">
+            <button class="tb-search-trigger" type="button" data-tb-search-open aria-label="Search stories">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <span class="tb-search-trigger__text">Search</span>
+                <kbd class="tb-kbd">/</kbd>
+            </button>
+            <button class="tb-icon-btn tb-theme-toggle" type="button" data-tb-theme-toggle aria-label="Toggle dark mode">
+                <svg class="tb-i tb-i--sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                <svg class="tb-i tb-i--moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </button>
+            <span class="tb-header__signin" data-tb-auth>
+                <a class="tb-btn tb-btn--sm" href="<?= $tbE($tbSignIn) ?>">Sign in</a>
+            </span>
+            <button class="tb-icon-btn tb-menu-btn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="tb-drawer">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+        </div>
+    </div>
+</header>
+
+<div class="tb-drawer" id="tb-drawer" aria-hidden="true">
+    <div class="tb-drawer__backdrop" data-tb-drawer-close></div>
+    <aside class="tb-drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="tb-drawer__head">
+            <span class="tb-brand"><span class="tb-brand__name"><?= $tbE($tbName) ?><span class="tb-brand__dot">.</span></span></span>
+            <button class="tb-icon-btn" type="button" data-tb-drawer-close aria-label="Close menu">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <nav class="tb-drawer__nav" aria-label="Mobile">
+            <a data-tb-nav href="<?= $tbE($tbHome) ?>">Home <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+            <a data-tb-nav href="<?= $tbE($tbBlog) ?>">Stories <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+            <a data-tb-nav href="<?= $tbE($tbTopics) ?>">Topics <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+        </nav>
+        <div>
+            <p class="tb-drawer__label">Popular topics</p>
+            <div class="tb-drawer__topics" data-tb-drawer-topics></div>
+        </div>
+        <div hidden>
+            <p class="tb-drawer__label">More</p>
+            <div class="tb-drawer__links" data-tb-drawer-links></div>
+        </div>
+        <div style="margin-top:auto;display:flex;gap:10px">
+            <button class="tb-btn tb-btn--ghost" type="button" data-tb-search-open data-tb-drawer-close style="flex:1">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Search
+            </button>
+            <a class="tb-btn" href="<?= $tbE($tbSignIn) ?>" data-tb-signin-link style="flex:1">Sign in</a>
+        </div>
+    </aside>
+</div>
+
+<div class="tb-search" hidden>
+    <div class="tb-search__backdrop" data-tb-search-close></div>
+    <div class="tb-search__panel" role="dialog" aria-modal="true" aria-label="Search stories">
+        <div class="tb-search__bar">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="tb-search__input" type="search" placeholder="Search stories…" autocomplete="off" aria-label="Search stories">
+            <button class="tb-icon-btn tb-icon-btn--plain" type="button" data-tb-search-close aria-label="Close search">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="tb-search__body"></div>
+        <div class="tb-search__foot">
+            <span><kbd class="tb-kbd">↑</kbd><kbd class="tb-kbd">↓</kbd> navigate</span>
+            <span><kbd class="tb-kbd">↵</kbd> open</span>
+            <span><kbd class="tb-kbd">esc</kbd> close</span>
+        </div>
+    </div>
+</div>
+<?php endif; ?>

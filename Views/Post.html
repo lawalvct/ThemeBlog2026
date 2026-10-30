@@ -1,0 +1,648 @@
+<?php
+    $tbE = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+    $tbFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+    // Works with ?slug=… and with a pretty page route such as /blog/{slug}.
+    $tbSlug = isset($_GET['slug']) ? trim((string) $_GET['slug']) : '';
+    $tbSite = rtrim(ltSiteUrl(), '/');
+?>
+<div class="tb-progress" id="tbProgress" aria-hidden="true"></div>
+
+<article id="tbArticle" aria-busy="true">
+    <header class="tb-container tb-article-head" id="tbHead">
+        <div style="display:grid;justify-items:center;gap:14px">
+            <div class="tb-skel tb-skel--line" style="width:180px"></div>
+            <div class="tb-skel tb-skel--line" style="width:90px;margin-top:10px"></div>
+            <div class="tb-skel" style="height:52px;width:min(760px,90%)"></div>
+            <div class="tb-skel" style="height:52px;width:min(520px,70%)"></div>
+            <div class="tb-skel tb-skel--line" style="width:min(560px,80%);margin-top:8px"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:16px"><div class="tb-skel" style="width:44px;height:44px;border-radius:50%"></div><div class="tb-skel tb-skel--line" style="width:160px"></div></div>
+        </div>
+    </header>
+
+    <div class="tb-container">
+        <figure class="tb-article-cover" id="tbCover" hidden></figure>
+
+        <div class="tb-article-grid">
+            <div class="tb-rail" id="tbRail" aria-label="Share this story"></div>
+
+            <div class="tb-article-main" style="min-width:0">
+                <details class="tb-toc-mobile" id="tbTocMobile" hidden>
+                    <summary>In this article <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                    <nav class="tb-toc" aria-label="Table of contents"><ol></ol></nav>
+                </details>
+
+                <div class="tb-prose" id="tbBody">
+                    <div style="display:grid;gap:14px">
+                        <div class="tb-skel tb-skel--line"></div><div class="tb-skel tb-skel--line"></div><div class="tb-skel tb-skel--line" style="width:92%"></div>
+                        <div class="tb-skel tb-skel--line"></div><div class="tb-skel tb-skel--line" style="width:76%"></div>
+                    </div>
+                </div>
+
+                <section class="tb-gallery" id="tbGallery" hidden aria-labelledby="tbGalleryTitle">
+                    <header class="tb-section-head" style="margin-bottom:18px">
+                        <h2 class="tb-section-head__title" id="tbGalleryTitle" style="font-size:1.4rem">Gallery</h2>
+                        <span class="tb-meta" id="tbGalleryCount"></span>
+                    </header>
+                    <div class="tb-gallery__grid" id="tbGalleryGrid"></div>
+                    <div class="tb-files" id="tbFiles"></div>
+                </section>
+
+                <footer class="tb-article-foot" id="tbFoot" hidden>
+                    <div class="tb-reactions" id="tbReactions">
+                        <div class="tb-reactions__head">
+                            <h2 class="tb-reactions__title">How did this story make you feel?</h2>
+                            <span class="tb-reactions__hint" id="tbReactHint"></span>
+                        </div>
+                        <div class="tb-reactions__list" id="tbReactList" role="group" aria-label="Reactions"></div>
+                    </div>
+
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px">
+                        <div class="tb-share" id="tbShareRow"></div>
+                        <button class="tb-report-link" type="button" id="tbReportBtn">
+                            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>
+                            Report this story
+                        </button>
+                    </div>
+
+                    <div class="tb-author-card" id="tbAuthorCard" hidden></div>
+                </footer>
+
+                <section class="tb-comments" id="tbComments" hidden aria-labelledby="tbCommentsTitle">
+                    <header class="tb-comments__head">
+                        <h2 class="tb-comments__title" id="tbCommentsTitle">Conversation <span id="tbCommentCount"></span></h2>
+                    </header>
+                    <div id="tbCommentEntry"></div>
+                    <ul class="tb-comment-list" id="tbCommentList"></ul>
+                </section>
+            </div>
+
+            <aside class="tb-aside" aria-label="Article tools">
+                <nav class="tb-toc" id="tbToc" hidden aria-label="Table of contents">
+                    <p class="tb-toc__title">In this article</p>
+                    <ol></ol>
+                </nav>
+                <div class="tb-aside-card" id="tbPopularBox" hidden>
+                    <p class="tb-aside-card__title">Most read</p>
+                    <div id="tbPopular"></div>
+                </div>
+            </aside>
+        </div>
+    </div>
+</article>
+
+<section class="tb-container tb-section tb-related" id="tbRelated" hidden>
+    <header class="tb-section-head">
+        <h2 class="tb-section-head__title">Keep <em>reading</em></h2>
+        <a class="tb-more-link" href="<?= $tbE($tbSite . '/ThemeBlog2026/Blog') ?>">All stories
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+    </header>
+    <div class="tb-grid tb-grid--3" id="tbRelatedGrid"></div>
+</section>
+
+<div class="tb-modal" id="tbReportModal" hidden>
+    <div class="tb-modal__backdrop" data-tb-close></div>
+    <form class="tb-modal__panel" id="tbReportForm" role="dialog" aria-modal="true" aria-labelledby="tbReportTitle">
+        <button class="tb-icon-btn tb-icon-btn--plain tb-modal__close" type="button" data-tb-close aria-label="Close">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <h2 class="tb-modal__title" id="tbReportTitle">Report this story</h2>
+        <p class="tb-modal__text">Tell the editors what is wrong. Reports are confidential.</p>
+        <div class="tb-modal__body">
+            <div class="tb-radio-list" role="radiogroup" aria-label="Reason">
+                <label class="tb-radio"><input type="radio" name="reason" value="spam" checked> Spam or misleading</label>
+                <label class="tb-radio"><input type="radio" name="reason" value="harassment"> Harassment or bullying</label>
+                <label class="tb-radio"><input type="radio" name="reason" value="hate_speech"> Hate speech</label>
+                <label class="tb-radio"><input type="radio" name="reason" value="copyright"> Copyright infringement</label>
+                <label class="tb-radio"><input type="radio" name="reason" value="other"> Something else</label>
+            </div>
+            <div class="tb-field">
+                <label class="tb-label" for="tbReportNote">Details <span style="font-weight:400;color:var(--tb-muted)">(optional)</span></label>
+                <textarea class="tb-textarea" id="tbReportNote" name="comments" maxlength="1000" placeholder="Add any context that will help us review this story."></textarea>
+            </div>
+            <div class="tb-modal__actions">
+                <button class="tb-btn tb-btn--ghost" type="button" data-tb-close>Cancel</button>
+                <button class="tb-btn tb-btn--accent" type="submit">Send report</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB) return;
+    const { $, $$, esc, plain, url, data, api, auth, fmt, icon, avatar, mediaBox, card, state, toast } = TB;
+
+    const SLUG = TB.param('slug', <?= json_encode($tbSlug, $tbFlags) ?>);
+    const REACTIONS = [
+        { type: 'like', emoji: '\u{1F44D}', label: 'Like' },
+        { type: 'love', emoji: '❤️', label: 'Love' },
+        { type: 'laugh', emoji: '\u{1F602}', label: 'Haha' },
+        { type: 'wow', emoji: '\u{1F62E}', label: 'Wow' },
+        { type: 'sad', emoji: '\u{1F622}', label: 'Sad' },
+        { type: 'angry', emoji: '\u{1F621}', label: 'Angry' },
+        { type: 'celebrate', emoji: '\u{1F389}', label: 'Celebrate' },
+        { type: 'dislike', emoji: '\u{1F44E}', label: 'Dislike' }
+    ];
+    let post = null;
+    let gallery = [];
+
+    /* ---------- page states ---------- */
+    function notFound(title, text) {
+        $('#tbArticle').removeAttribute('aria-busy');
+        $('#tbArticle').innerHTML = '<div class="tb-container tb-section">' +
+            state('empty', title, text, { href: url.blog(), label: 'Browse all stories' }) + '</div>';
+        $('#tbRelated').hidden = true;
+        document.title = title + ' — ' + (TB.config.siteName || '');
+    }
+
+    const requireSignIn = (action) => TB.promptSignIn(action);
+
+    /* ---------- head, cover, body ---------- */
+    function renderHead() {
+        const crumbs = '<nav class="tb-crumbs" aria-label="Breadcrumb">' +
+            '<a href="' + esc(url.home()) + '">Home</a>' + icon('chevronRight') +
+            '<a href="' + esc(url.blog()) + '">Stories</a>' +
+            (post.category ? icon('chevronRight') + (post.categoryId ? '<a href="' + esc(url.category(post.categoryId)) + '">' + esc(post.category) + '</a>' : '<span>' + esc(post.category) + '</span>') : '') +
+            '</nav>';
+        const authorName = post.author || 'Editorial team';
+        const authorLink = post.authorId ? '<a href="' + esc(url.author(post.authorId)) + '">' + esc(authorName) + '</a>' : esc(authorName);
+        const metaParts = [];
+        if (post.date) metaParts.push('<time datetime="' + esc(fmt.iso(post.date)) + '">' + esc(fmt.date(post.date)) + '</time>');
+        if (post.readingTime) metaParts.push('<span>' + esc(fmt.readTime(post.readingTime)) + '</span>');
+        metaParts.push('<span class="tb-meta__item">' + icon('eye') + '<span id="tbViews">' + esc(fmt.count(post.views)) + '</span></span>');
+
+        $('#tbHead').innerHTML = crumbs +
+            (post.category ? '<div class="tb-article-head__kicker">' + TB.kicker(post) + '</div>' : '') +
+            '<h1 class="tb-article-head__title">' + esc(post.title) + '</h1>' +
+            (post.excerpt ? '<p class="tb-article-head__dek">' + esc(post.excerpt) + '</p>' : '') +
+            '<div class="tb-byline">' + avatar(authorName, post.avatar, 46) +
+            '<div><div class="tb-byline__name">By ' + authorLink + '</div><div class="tb-meta">' + metaParts.join('') + '</div></div></div>';
+    }
+
+    function renderCover() {
+        if (!post.cover) return;
+        const fig = $('#tbCover');
+        const caption = post.coverAlt && !/^(image|article banner|cover)$/i.test(post.coverAlt) ? '<figcaption>' + esc(post.coverAlt) + '</figcaption>' : '';
+        fig.innerHTML = '<button type="button" style="all:unset;display:block;cursor:zoom-in;width:100%" aria-label="View cover image">' + mediaBox(post, { eager: true }) + '</button>' + caption;
+        fig.hidden = false;
+        fig.querySelector('button').addEventListener('click', () => openGalleryAt(post.cover));
+    }
+
+    function renderBody() {
+        const body = $('#tbBody');
+        const out = TB.renderContent(post.content, post.id);
+        body.innerHTML = out.html || (post.excerpt ? '<p>' + esc(post.excerpt) + '</p>' : '<p><em>This story has no content yet.</em></p>');
+
+        $$('pre', body).forEach((pre) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tb-copy-code';
+            btn.textContent = 'Copy';
+            btn.addEventListener('click', async () => {
+                const ok = await TB.copyText(pre.innerText.replace(/\nCopy$/, ''));
+                btn.textContent = ok ? 'Copied' : 'Failed';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+            });
+            pre.appendChild(btn);
+        });
+
+        $$('img', body).forEach((img) => {
+            img.addEventListener('click', () => {
+                const items = $$('img', body).map((i) => ({ src: i.currentSrc || i.src, alt: i.alt }));
+                TB.lightbox.open(items, items.findIndex((i) => i.src === (img.currentSrc || img.src)));
+            });
+        });
+
+        renderToc(out.headings);
+    }
+
+    function renderToc(headings) {
+        if (!headings || headings.length < 2) return;
+        const items = headings.map((h) => '<li' + (h.level === 3 ? ' class="is-sub"' : '') + '><a href="#' + esc(h.id) + '" data-toc="' + esc(h.id) + '">' + esc(h.text) + '</a></li>').join('');
+        const desk = $('#tbToc');
+        const mob = $('#tbTocMobile');
+        desk.querySelector('ol').innerHTML = items;
+        mob.querySelector('ol').innerHTML = items;
+        desk.hidden = false;
+        mob.hidden = false;
+
+        $$('[data-toc]').forEach((a) => a.addEventListener('click', (e) => {
+            const target = document.getElementById(a.dataset.toc);
+            if (!target) return;
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            history.replaceState(null, '', '#' + a.dataset.toc);
+            if (mob.open) mob.open = false;
+        }));
+
+        // Highlight the last heading that has scrolled past the header.
+        const links = $$('[data-toc]', desk);
+        const targets = headings.map((h) => document.getElementById(h.id)).filter(Boolean);
+        let ticking = false;
+        const spy = () => {
+            ticking = false;
+            const line = 120;
+            let current = '';
+            targets.forEach((t) => { if (t.getBoundingClientRect().top <= line) current = t.id; });
+            links.forEach((l) => l.classList.toggle('is-active', l.dataset.toc === current));
+        };
+        window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(spy); } }, { passive: true });
+        spy();
+    }
+
+    /* ---------- gallery ---------- */
+    function openGalleryAt(src) {
+        if (!gallery.length) gallery = [{ src: post.cover, alt: post.coverAlt || post.title, type: 'image' }];
+        const i = Math.max(0, gallery.findIndex((g) => g.src === src));
+        TB.lightbox.open(gallery, i);
+    }
+
+    function renderGallery() {
+        const all = post.media || [];
+        const visual = all.filter((m) => /^(image|video)\//.test(m.mimeType || ''));
+        gallery = visual.map((m) => ({ src: url.media(m.storagePath), alt: plain(m.altText || ''), type: String(m.mimeType).indexOf('video/') === 0 ? 'video' : 'image', id: String(m.mediaId || '') }));
+        const grid = visual.filter((m) => String(m.mediaId || '') !== post.coverId || !post.cover);
+        const files = all.filter((m) => !/^(image|video)\//.test(m.mimeType || ''));
+        if (!grid.length && !files.length) return;
+
+        $('#tbGalleryGrid').innerHTML = grid.map((m) => {
+            const src = url.media(m.storagePath);
+            const isVideo = String(m.mimeType).indexOf('video/') === 0;
+            const inner = isVideo
+                ? '<span class="tb-media"><video src="' + esc(src) + '#t=1" muted preload="metadata" style="width:100%;height:100%;object-fit:cover"></video></span><span class="tb-gallery__play">' + icon('play') + '</span>'
+                : '<span class="tb-media"><img src="' + esc(src) + '" alt="' + esc(plain(m.altText || m.originalName || '')) + '" loading="lazy" decoding="async"></span>';
+            return '<button class="tb-gallery__item" type="button" data-src="' + esc(src) + '" aria-label="Open ' + (isVideo ? 'video' : 'image') + '">' + inner + '</button>';
+        }).join('');
+        $('#tbFiles').innerHTML = files.map((m) => {
+            const isAudio = String(m.mimeType || '').indexOf('audio/') === 0;
+            const src = url.media(m.storagePath);
+            if (isAudio) {
+                return '<div class="tb-file">' + icon('music') + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">' + esc(m.originalName || 'Audio') + '</span><audio controls preload="metadata" src="' + esc(src) + '" style="max-width:260px"></audio></div>';
+            }
+            return '<a class="tb-file" href="' + esc(src) + '" target="_blank" rel="noopener">' + icon('file') + '<span style="flex:1">' + esc(m.originalName || 'Download file') + '</span>' + icon('arrowRight') + '</a>';
+        }).join('');
+        const count = grid.length + files.length;
+        $('#tbGalleryGrid').dataset.count = String(Math.min(grid.length, 5));
+        $('#tbGalleryCount').textContent = count + (count === 1 ? ' item' : ' items');
+        $('#tbGallery').hidden = false;
+        $('#tbGalleryGrid').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-src]');
+            if (b) openGalleryAt(b.dataset.src);
+        });
+    }
+
+    /* ---------- reactions, share, author, report ---------- */
+    function renderReactions() {
+        const list = $('#tbReactList');
+        const hint = $('#tbReactHint');
+        const paint = () => {
+            list.innerHTML = REACTIONS.map((r) =>
+                '<button class="tb-reaction" type="button" data-reaction="' + r.type + '" aria-pressed="' + (post.userReaction === r.type) + '" title="' + r.label + '">' +
+                '<span class="tb-reaction__emoji" aria-hidden="true">' + r.emoji + '</span>' + r.label + '</button>').join('');
+            const current = REACTIONS.find((r) => r.type === post.userReaction);
+            hint.textContent = current ? 'You reacted with ' + current.label.toLowerCase() + '.' : (auth.isSignedIn() ? fmt.plural(post.likes, 'like') + ' so far' : 'Sign in to react');
+        };
+        paint();
+        list.addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-reaction]');
+            if (!b) return;
+            if (!auth.isSignedIn()) return requireSignIn('react to stories');
+            const previous = post.userReaction;
+            post.userReaction = b.dataset.reaction;
+            paint();
+            try {
+                await api.post('blogs/posts/react', { postSlug: post.slug, reaction: post.userReaction });
+                toast('Thanks for your reaction!', 'success');
+            } catch (err) {
+                post.userReaction = previous;
+                paint();
+                toast(err.message, 'error');
+            }
+        });
+    }
+
+    function shareLinks(variant) {
+        const link = encodeURIComponent(url.current());
+        const text = encodeURIComponent(post.title);
+        const cls = variant === 'rail' ? 'tb-icon-btn' : 'tb-icon-btn';
+        const items = [
+            ['X', 'brandX', 'https://twitter.com/intent/tweet?url=' + link + '&text=' + text],
+            ['LinkedIn', 'linkedin', 'https://www.linkedin.com/sharing/share-offsite/?url=' + link],
+            ['Facebook', 'facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + link],
+            ['WhatsApp', 'whatsapp', 'https://wa.me/?text=' + text + '%20' + link],
+            ['Email', 'mail', 'mailto:?subject=' + text + '&body=' + link]
+        ];
+        return items.map((i) => '<a class="' + cls + '" href="' + esc(i[2]) + '" target="_blank" rel="noopener noreferrer" aria-label="Share on ' + i[0] + '" title="' + i[0] + '">' + icon(i[1]) + '</a>').join('') +
+            '<button class="' + cls + '" type="button" data-copy-link aria-label="Copy link" title="Copy link">' + icon('link') + '</button>' +
+            (navigator.share ? '<button class="' + cls + '" type="button" data-native-share aria-label="More sharing options" title="Share">' + icon('share') + '</button>' : '');
+    }
+
+    function renderShare() {
+        $('#tbRail').innerHTML = '<span class="tb-rail__label">Share</span>' + shareLinks('rail');
+        $('#tbShareRow').innerHTML = '<span class="tb-share__label">Share</span>' + shareLinks('row');
+        document.addEventListener('click', async (e) => {
+            if (e.target.closest('[data-copy-link]')) {
+                const ok = await TB.copyText(url.current());
+                toast(ok ? 'Link copied to clipboard' : 'Could not copy the link', ok ? 'success' : 'error');
+            } else if (e.target.closest('[data-native-share]')) {
+                try { await navigator.share({ title: post.title, text: post.excerpt, url: url.current() }); } catch (err) { /* dismissed */ }
+            }
+        });
+    }
+
+    function socialUrl(kind, value) {
+        const v = String(value || '').trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) return v;
+        const handle = v.replace(/^@/, '');
+        if (kind === 'twitter') return 'https://x.com/' + encodeURIComponent(handle);
+        if (kind === 'linkedin') return 'https://www.linkedin.com/in/' + encodeURIComponent(handle);
+        if (kind === 'facebook') return 'https://www.facebook.com/' + encodeURIComponent(handle);
+        return '';
+    }
+
+    function renderAuthor() {
+        if (!post.author) return;
+        const el = $('#tbAuthorCard');
+        const links = [['twitter', 'brandX', 'X'], ['linkedin', 'linkedin', 'LinkedIn'], ['facebook', 'facebook', 'Facebook']]
+            .map((s) => { const href = socialUrl(s[0], post[s[0]]); return href ? '<a class="tb-icon-btn" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" aria-label="' + s[2] + '">' + icon(s[1]) + '</a>' : ''; })
+            .join('');
+        el.innerHTML = avatar(post.author, post.avatar, 72) +
+            '<div><p class="tb-author-card__label">Written by</p>' +
+            '<h3 class="tb-author-card__name">' + esc(post.author) + '</h3>' +
+            (post.bio ? '<p class="tb-author-card__bio">' + esc(post.bio) + '</p>' : '') +
+            '<div class="tb-author-card__links">' +
+            (post.authorId ? '<a class="tb-btn tb-btn--ghost tb-btn--sm" href="' + esc(url.author(post.authorId)) + '">More from ' + esc(post.author.split(' ')[0]) + ' ' + icon('arrowRight') + '</a>' : '') +
+            links + '</div></div>';
+        el.hidden = false;
+    }
+
+    function initReport() {
+        const modal = $('#tbReportModal');
+        const form = $('#tbReportForm');
+        $('#tbReportBtn').addEventListener('click', () => TB.openModal(modal));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') TB.closeModal(modal); });
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('[type="submit"]');
+            const reason = (form.querySelector('input[name="reason"]:checked') || {}).value || 'other';
+            btn.disabled = true;
+            btn.textContent = 'Sending…';
+            try {
+                await api.post('blogs/reports/create', { postSlug: post.slug, reason: reason, comments: form.comments.value.trim() });
+                TB.closeModal(modal);
+                form.reset();
+                toast('Thank you — the editors will review this story.', 'success');
+            } catch (err) {
+                toast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send report';
+            }
+        });
+    }
+
+    /* ---------- comments ---------- */
+    function countComments(list) {
+        return (list || []).reduce((n, c) => n + 1 + countComments(c.replies), 0);
+    }
+
+    function commentHTML(c, depth) {
+        const name = plain(c.author) || 'Reader';
+        const liked = c.isLikedByUser === true || Number(c.isLikedByUser) === 1;
+        const replies = Array.isArray(c.replies) ? c.replies : [];
+        const isAuthor = post.authorId && String(c.userId) === post.authorId;
+        return '<li class="tb-comment" data-id="' + esc(c.ltId) + '" id="comment-' + esc(c.ltId) + '">' +
+            avatar(name, url.media(c.avatar), depth ? 32 : 40) +
+            '<div class="tb-comment__main"><div class="tb-comment__head"><span class="tb-comment__author">' + esc(name) + '</span>' +
+            (isAuthor ? '<span class="tb-comment__badge">Author</span>' : '') +
+            '<time class="tb-comment__time" datetime="' + esc(fmt.iso(c.createdAt)) + '" title="' + esc(fmt.date(c.createdAt)) + '">' + esc(fmt.ago(c.createdAt)) + '</time></div>' +
+            '<p class="tb-comment__body">' + esc(plain(c.body)) + '</p>' +
+            '<div class="tb-comment__actions">' +
+            '<button class="tb-comment__btn" type="button" data-like aria-pressed="' + liked + '" aria-label="Like comment">' + icon('heart') + '<span>' + (Number(c.likes) || 0) + '</span></button>' +
+            (depth < 3 ? '<button class="tb-comment__btn" type="button" data-reply>' + icon('reply') + 'Reply</button>' : '') +
+            '</div></div>' +
+            (replies.length ? '<ul class="tb-comment__replies">' + replies.map((r) => commentHTML(r, depth + 1)).join('') + '</ul>' : '') +
+            '</li>';
+    }
+
+    function formHTML(parentId) {
+        const u = auth.user() || {};
+        const name = u.fullname || u.username || 'You';
+        return '<form class="tb-comment-form' + (parentId ? ' tb-reply-form' : '') + '" data-parent="' + esc(parentId || '') + '">' +
+            '<div class="tb-comment-form__row">' + avatar(name, '', parentId ? 32 : 40) +
+            '<label class="tb-sr" for="tbc-' + esc(parentId || 'root') + '">Your comment</label>' +
+            '<textarea class="tb-textarea" id="tbc-' + esc(parentId || 'root') + '" name="body" required maxlength="2000" placeholder="' + (parentId ? 'Write a reply…' : 'Share your thoughts…') + '"></textarea></div>' +
+            '<div class="tb-comment-form__actions">' +
+            (parentId ? '<button class="tb-btn tb-btn--ghost tb-btn--sm" type="button" data-cancel>Cancel</button>' : '<small>Be kind, be curious, stay on topic.</small>') +
+            '<button class="tb-btn tb-btn--accent' + (parentId ? ' tb-btn--sm' : '') + '" type="submit">' + (parentId ? 'Reply' : 'Post comment') + '</button></div></form>';
+    }
+
+    function renderComments() {
+        const list = post.comments || [];
+        const total = countComments(list);
+        $('#tbCommentCount').textContent = total ? '(' + total + ')' : '';
+        $('#tbCommentEntry').innerHTML = auth.isSignedIn()
+            ? formHTML('')
+            : '<div class="tb-signin-prompt"><span><strong>Join the conversation.</strong> Sign in to comment, reply and react.</span>' +
+              '<span style="display:flex;gap:8px"><a class="tb-btn tb-btn--ghost tb-btn--sm" href="' + esc(url.signUp()) + '">Create account</a><a class="tb-btn tb-btn--sm" href="' + esc(url.signIn()) + '">Sign in</a></span></div>';
+        $('#tbCommentList').innerHTML = list.length
+            ? list.map((c) => commentHTML(c, 0)).join('')
+            : '<li class="tb-meta" style="padding:8px 0 4px">No comments yet — start the conversation.</li>';
+        $('#tbComments').hidden = false;
+    }
+
+    async function refreshComments(expectId) {
+        try {
+            const fresh = await data.post(post.slug);
+            const before = countComments(post.comments);
+            post.comments = fresh.comments;
+            renderComments();
+            if (countComments(post.comments) <= before) toast('Thanks! Your comment will appear once it is approved.', 'success');
+            else toast('Comment posted', 'success');
+            if (expectId) { const el = document.getElementById('comment-' + expectId); if (el) el.scrollIntoView({ block: 'center' }); }
+        } catch (e) { toast('Comment sent. Refresh to see it.', 'success'); }
+    }
+
+    function initComments() {
+        const section = $('#tbComments');
+        section.addEventListener('submit', async (e) => {
+            const form = e.target.closest('.tb-comment-form');
+            if (!form) return;
+            e.preventDefault();
+            const body = form.body.value.trim();
+            if (!body) return;
+            const btn = form.querySelector('[type="submit"]');
+            btn.disabled = true;
+            try {
+                const res = await api.post('blogs/comments/create', { postSlug: post.slug, body: body, parentId: form.dataset.parent || '' });
+                form.reset();
+                await refreshComments(res && res.ltId);
+            } catch (err) {
+                toast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        section.addEventListener('click', async (e) => {
+            const cancel = e.target.closest('[data-cancel]');
+            if (cancel) { cancel.closest('form').remove(); return; }
+
+            const reply = e.target.closest('[data-reply]');
+            if (reply) {
+                if (!auth.isSignedIn()) return requireSignIn('reply to comments');
+                const main = reply.closest('.tb-comment__main');
+                const li = reply.closest('.tb-comment');
+                const existing = main.querySelector('.tb-reply-form');
+                if (existing) { existing.querySelector('textarea').focus(); return; }
+                main.insertAdjacentHTML('beforeend', formHTML(li.dataset.id));
+                main.querySelector('.tb-reply-form textarea').focus();
+                return;
+            }
+
+            const like = e.target.closest('[data-like]');
+            if (like) {
+                if (!auth.isSignedIn()) return requireSignIn('like comments');
+                const id = like.closest('.tb-comment').dataset.id;
+                const countEl = like.querySelector('span');
+                const was = like.getAttribute('aria-pressed') === 'true';
+                const n = parseInt(countEl.textContent, 10) || 0;
+                like.setAttribute('aria-pressed', String(!was));
+                countEl.textContent = Math.max(0, n + (was ? -1 : 1));
+                try {
+                    const res = await api.post('blogs/comments/like', { commentId: id });
+                    if (res === 'liked' || res === 'unliked') {
+                        like.setAttribute('aria-pressed', String(res === 'liked'));
+                        countEl.textContent = Math.max(0, n + (res === 'liked' ? (was ? 0 : 1) : (was ? -1 : 0)));
+                    }
+                } catch (err) {
+                    like.setAttribute('aria-pressed', String(was));
+                    countEl.textContent = n;
+                    toast(err.message, 'error');
+                }
+            }
+        });
+    }
+
+    /* ---------- side content ---------- */
+    async function loadPopular() {
+        try {
+            const items = (await data.widget('popular', { limit: 5 })).filter((p) => p.slug !== post.slug).slice(0, 4);
+            if (!items.length) return;
+            $('#tbPopular').innerHTML = items.map((p) => card.compact(p, { meta: ['views'] })).join('');
+            $('#tbPopularBox').hidden = false;
+        } catch (e) { /* optional */ }
+    }
+
+    async function loadRelated() {
+        try {
+            let items = (await data.widget('related', { limit: 4, postId: post.id, categoryId: post.categoryId })).filter((p) => p.slug !== post.slug);
+            if (items.length < 3) {
+                const seen = new Set(items.map((p) => p.slug).concat(post.slug));
+                const latest = await data.widget('latest', { limit: 6 }).catch(() => []);
+                items = items.concat(latest.filter((p) => !seen.has(p.slug)));
+            }
+            items = items.slice(0, 3);
+            if (!items.length) return;
+            $('#tbRelatedGrid').innerHTML = items.map((p, i) => card.standard(p, { index: i })).join('');
+            $('#tbRelated').hidden = false;
+        } catch (e) { /* optional */ }
+    }
+
+    function trackView() {
+        const key = 'tb-viewed-' + post.slug;
+        if (TB.store.sessionGet(key)) return;
+        TB.store.sessionSet(key, '1');
+        api.post('blogs/posts/view-update', { slug: post.slug }).then(() => {
+            const el = $('#tbViews');
+            if (el) el.textContent = fmt.count(post.views + 1);
+        }).catch(() => { /* non-critical */ });
+    }
+
+    function initProgress() {
+        const bar = $('#tbProgress');
+        const body = $('#tbBody');
+        let ticking = false;
+        const update = () => {
+            const rect = body.getBoundingClientRect();
+            const total = rect.height - window.innerHeight * 0.4;
+            const done = Math.min(1, Math.max(0, (-rect.top + window.innerHeight * 0.25) / Math.max(1, total)));
+            bar.style.transform = 'scaleX(' + done + ')';
+            ticking = false;
+        };
+        window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+        window.addEventListener('resize', update);
+        update();
+    }
+
+    function setMeta(attr, key, value) {
+        if (!value) return;
+        let el = document.head.querySelector('meta[' + attr + '="' + key + '"]');
+        if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.appendChild(el); }
+        el.setAttribute('content', value);
+    }
+
+    function updateMeta() {
+        document.title = post.title + ' — ' + (TB.config.siteName || '');
+        setMeta('name', 'description', post.excerpt);
+        setMeta('property', 'og:title', post.title);
+        setMeta('property', 'og:description', post.excerpt);
+        setMeta('property', 'og:type', 'article');
+        setMeta('property', 'og:url', url.current());
+        setMeta('property', 'og:image', post.cover);
+        const ld = document.createElement('script');
+        ld.type = 'application/ld+json';
+        ld.textContent = JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            headline: post.title,
+            description: post.excerpt || undefined,
+            image: post.cover || undefined,
+            datePublished: fmt.iso(post.date) || undefined,
+            author: post.author ? { '@type': 'Person', name: post.author } : undefined,
+            publisher: { '@type': 'Organization', name: TB.config.siteName || '' },
+            mainEntityOfPage: url.current()
+        });
+        document.head.appendChild(ld);
+    }
+
+    /* ---------- boot ---------- */
+    (async function init() {
+        if (!SLUG) return notFound('No story selected', 'Choose a story from the archive to start reading.');
+        try {
+            post = await data.post(SLUG);
+        } catch (err) {
+            if (/no post/i.test(err.message)) return notFound('Story not found', 'It may have been moved or unpublished.');
+            return notFound('Unable to load this story', err.message);
+        }
+        if (!post) return notFound('Story not found', 'It may have been moved or unpublished.');
+
+        $('#tbArticle').removeAttribute('aria-busy');
+        renderHead();
+        renderCover();
+        renderBody();
+        renderGallery();
+        renderReactions();
+        renderShare();
+        renderAuthor();
+        $('#tbFoot').hidden = false;
+        renderComments();
+        initComments();
+        initReport();
+        initProgress();
+        updateMeta();
+        trackView();
+        loadPopular();
+        loadRelated();
+
+        if (window.location.hash) {
+            const target = document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+            if (target) setTimeout(() => target.scrollIntoView({ block: 'start' }), 60);
+        }
+    })();
+});
+</script>

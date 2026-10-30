@@ -1,0 +1,181 @@
+<section class="tb-container tb-page-head">
+    <span class="tb-kicker">The archive</span>
+    <h1 class="tb-page-head__title" id="tbBlogTitle">Every <em>story</em>, in one place</h1>
+    <p class="tb-page-head__lead">Search, filter and sort everything we have published — from the newest pieces to the all-time favourites.</p>
+</section>
+
+<div class="tb-container">
+    <div class="tb-toolbar" id="tbToolbar">
+        <div class="tb-toolbar__row">
+            <form class="tb-toolbar__search" role="search" id="tbSearchForm">
+                <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <label class="tb-sr" for="tbQuery">Search stories</label>
+                <input class="tb-input" id="tbQuery" type="search" name="q" placeholder="Search by title or summary…" autocomplete="off">
+                <button class="tb-icon-btn tb-icon-btn--plain tb-toolbar__clear" type="button" id="tbClear" aria-label="Clear search" hidden>
+                    <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </form>
+            <div class="tb-toolbar__sort">
+                <label class="tb-sr" for="tbSort">Sort stories</label>
+                <select class="tb-select" id="tbSort">
+                    <option value="latest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="popular">Most read</option>
+                    <option value="liked">Most liked</option>
+                    <option value="comments">Most discussed</option>
+                    <option value="title_asc">Title A–Z</option>
+                    <option value="title_desc">Title Z–A</option>
+                </select>
+            </div>
+        </div>
+        <div class="tb-chips" id="tbChips" role="toolbar" aria-label="Filter by topic">
+            <button class="tb-pill is-active" type="button" data-cat="" aria-pressed="true">All topics</button>
+        </div>
+    </div>
+
+    <p class="tb-results-info" id="tbInfo" role="status" aria-live="polite"></p>
+    <div class="tb-grid tb-grid--3" id="tbGrid"></div>
+    <nav class="tb-pager" id="tbPager" aria-label="Pagination"></nav>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB) return;
+    const { $, $$, esc, data, card, state, errorState, skeletonCards, pager, debounce } = TB;
+
+    const PER_PAGE = 12;
+    const SORTS = ['latest', 'oldest', 'popular', 'liked', 'comments', 'title_asc', 'title_desc'];
+    const grid = $('#tbGrid');
+    const info = $('#tbInfo');
+    const pagerEl = $('#tbPager');
+    const input = $('#tbQuery');
+    const clearBtn = $('#tbClear');
+    const sortEl = $('#tbSort');
+    const chips = $('#tbChips');
+    let categories = [];
+    let seq = 0;
+
+    function readState() {
+        const p = new URLSearchParams(window.location.search);
+        const sort = p.get('sort');
+        return {
+            q: (p.get('q') || '').trim(),
+            category: (p.get('category') || '').trim(),
+            sort: SORTS.indexOf(sort) !== -1 ? sort : 'latest',
+            page: Math.max(1, parseInt(p.get('page'), 10) || 1)
+        };
+    }
+    let st = readState();
+
+    function writeState(replace) {
+        const p = new URLSearchParams();
+        if (st.q) p.set('q', st.q);
+        if (st.category) p.set('category', st.category);
+        if (st.sort !== 'latest') p.set('sort', st.sort);
+        if (st.page > 1) p.set('page', st.page);
+        const next = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
+        history[replace ? 'replaceState' : 'pushState'](null, '', next);
+    }
+
+    function syncControls() {
+        input.value = st.q;
+        clearBtn.hidden = !st.q;
+        sortEl.value = st.sort;
+        $$('.tb-pill', chips).forEach((b) => {
+            const on = (b.dataset.cat || '') === st.category;
+            b.classList.toggle('is-active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+
+    function catName(id) {
+        const c = categories.find((x) => x.id === String(id));
+        return c ? c.name : '';
+    }
+
+    async function load(scroll) {
+        const mine = ++seq;
+        syncControls();
+        grid.innerHTML = skeletonCards(6);
+        pagerEl.innerHTML = '';
+        info.textContent = 'Loading stories…';
+        if (scroll) $('#tbToolbar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        try {
+            const res = await data.posts({ page: st.page, limit: PER_PAGE, q: st.q, category: st.category || undefined, sort: st.sort });
+            if (mine !== seq) return;
+
+            if (!res.items.length && st.page > 1 && res.pages && st.page > res.pages) {
+                st.page = res.pages;
+                writeState(true);
+                return load(false);
+            }
+
+            const where = (st.category && catName(st.category) ? ' in <strong>' + esc(catName(st.category)) + '</strong>' : '') +
+                (st.q ? ' matching <strong>“' + esc(st.q) + '”</strong>' : '');
+            if (res.items.length) {
+                const from = (res.page - 1) * PER_PAGE + 1;
+                const to = from + res.items.length - 1;
+                info.innerHTML = 'Showing <strong>' + from + '–' + to + '</strong> of <strong>' + res.total + '</strong> ' + (res.total === 1 ? 'story' : 'stories') + where;
+                grid.innerHTML = res.items.map((p, i) => card.standard(p, { index: i % 6 })).join('');
+            } else {
+                info.innerHTML = 'No stories' + where;
+                grid.innerHTML = st.q || st.category
+                    ? state('search', 'Nothing matched your filters', 'Try another keyword, pick a different topic or clear the filters.')
+                    : state('empty', 'No stories published yet', 'Published MdBlog posts will appear here automatically.');
+            }
+            pagerEl.innerHTML = pager(res.page, res.pages);
+            document.title = (st.q ? 'Search: ' + st.q : (st.category ? catName(st.category) || 'Stories' : 'All stories')) + ' — ' + (TB.config.siteName || '');
+        } catch (err) {
+            if (mine !== seq) return;
+            info.textContent = '';
+            grid.innerHTML = errorState(err);
+        }
+    }
+
+    async function loadChips() {
+        try {
+            categories = await data.categories();
+            chips.insertAdjacentHTML('beforeend', categories.map((c) =>
+                '<button class="tb-pill" type="button" data-cat="' + esc(c.id) + '" aria-pressed="false">' + esc(c.name) + '</button>').join(''));
+            syncControls();
+            const active = chips.querySelector('.is-active');
+            if (active && active.dataset.cat) active.scrollIntoView({ block: 'nearest', inline: 'center' });
+        } catch (e) { /* chips are optional */ }
+    }
+
+    const onType = debounce(() => {
+        const q = input.value.trim();
+        if (q === st.q) return;
+        st.q = q;
+        st.page = 1;
+        writeState(false);
+        load(false);
+    }, 380);
+
+    input.addEventListener('input', () => { clearBtn.hidden = !input.value; onType(); });
+    $('#tbSearchForm').addEventListener('submit', (e) => { e.preventDefault(); onType(); });
+    clearBtn.addEventListener('click', () => { input.value = ''; clearBtn.hidden = true; input.focus(); onType(); });
+    sortEl.addEventListener('change', () => { st.sort = sortEl.value; st.page = 1; writeState(false); load(false); });
+    chips.addEventListener('click', (e) => {
+        const b = e.target.closest('.tb-pill');
+        if (!b) return;
+        st.category = b.dataset.cat || '';
+        st.page = 1;
+        writeState(false);
+        load(false);
+    });
+    pagerEl.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-page]');
+        if (!b || b.disabled) return;
+        st.page = parseInt(b.dataset.page, 10) || 1;
+        writeState(false);
+        load(true);
+    });
+    window.addEventListener('popstate', () => { st = readState(); load(false); });
+
+    loadChips().then(() => load(false));
+});
+</script>

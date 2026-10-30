@@ -1,0 +1,125 @@
+<div class="st-head">
+    <div>
+        <h1 class="st-head__title">Reports</h1>
+        <p class="st-head__sub" id="stRepSub">Stories readers have flagged for review.</p>
+    </div>
+    <div class="st-head__actions">
+        <button class="tb-btn tb-btn--ghost" type="button" id="stRepRefresh">
+            <svg class="tb-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> Refresh
+        </button>
+    </div>
+</div>
+
+<section class="st-card st-card--flush">
+    <div class="st-toolbar">
+        <div class="st-tabs" role="tablist" aria-label="Filter by status" id="stRepTabs"></div>
+    </div>
+    <div class="st-table-wrap">
+        <table class="st-table">
+            <thead><tr><th>Story</th><th>Reason</th><th>Details</th><th>Reported by</th><th>Status</th><th>Date</th><th class="st-actions-col"><span class="tb-sr">Actions</span></th></tr></thead>
+            <tbody id="stRepRows"></tbody>
+        </table>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    'use strict';
+    const TB = window.TB;
+    if (!TB || !TB.studio) return;
+    const { $, esc, plain, fmt, icon, api, url, studio } = TB;
+
+    studio.setTitle('Reports');
+    const REASONS = { spam: 'Spam or misleading', harassment: 'Harassment', hate_speech: 'Hate speech', copyright: 'Copyright', other: 'Other' };
+    const TABS = [['pending', 'Pending'], ['reviewed', 'Reviewed'], ['action_taken', 'Action taken'], ['dismissed', 'Dismissed'], ['all', 'All']];
+    const rowsEl = $('#stRepRows');
+    let reports = [];
+    let status = 'pending';
+
+    function renderTabs() {
+        $('#stRepTabs').innerHTML = TABS.map((t) => {
+            const n = t[0] === 'all' ? reports.length : reports.filter((r) => r.status === t[0]).length;
+            return '<button class="st-tab" role="tab" type="button" data-status="' + t[0] + '" aria-selected="' + (status === t[0]) + '">' + t[1] + ' <span class="st-tab__count">' + n + '</span></button>';
+        }).join('');
+    }
+
+    function row(r) {
+        const act = (to, ic, label, cls) => r.status === to ? '' : '<button class="st-icon-btn' + (cls ? ' ' + cls : '') + '" type="button" data-status-to="' + to + '" title="' + label + '" aria-label="' + label + '">' + icon(ic) + '</button>';
+        return '<tr data-id="' + esc(r.id) + '">' +
+            '<td><div class="st-cell-title" style="min-width:200px"><span><strong>' + (r.slug ? '<a href="' + esc(url.post(r.slug)) + '" target="_blank" rel="noopener">' + esc(r.title || r.slug) + '</a>' : esc(r.title || 'Deleted post')) + '</strong>' +
+            (r.postAuthor ? '<span class="st-cell-sub">By ' + esc(r.postAuthor) + '</span>' : '') + '</span></div></td>' +
+            '<td class="st-cell-muted">' + esc(REASONS[r.reason] || r.reason || '—') + '</td>' +
+            '<td><span class="st-cell-body">' + esc(r.details || '—') + '</span></td>' +
+            '<td class="st-cell-muted">' + esc(r.reporter || 'Anonymous') + '</td>' +
+            '<td>' + studio.badge(r.status) + '</td>' +
+            '<td class="st-cell-muted" title="' + esc(fmt.date(r.created)) + '">' + esc(fmt.ago(r.created) || '—') + '</td>' +
+            '<td class="st-actions-col"><span class="st-row-actions">' +
+            act('reviewed', 'eye', 'Mark as reviewed') +
+            act('action_taken', 'check', 'Mark action taken', 'st-icon-btn--good') +
+            act('dismissed', 'x', 'Dismiss report') +
+            (r.slug ? '<a class="st-icon-btn" href="' + esc(studio.url('Editor', { id: r.postId })) + '" title="Edit the story" aria-label="Edit the reported story">' + icon('edit') + '</a>' : '') +
+            '<button class="st-icon-btn st-icon-btn--danger" type="button" data-delete title="Delete report" aria-label="Delete report">' + icon('trash') + '</button>' +
+            '</span></td></tr>';
+    }
+
+    function render() {
+        renderTabs();
+        const list = reports.filter((r) => status === 'all' || r.status === status);
+        rowsEl.innerHTML = list.length ? list.map(row).join('')
+            : studio.emptyRow(7, reports.length ? 'Nothing here' : 'No reports', reports.length ? 'No reports with this status.' : 'Reader reports will appear here.');
+        const pending = reports.filter((r) => r.status === 'pending').length;
+        $('#stRepSub').textContent = pending ? pending + ' report' + (pending === 1 ? ' needs' : 's need') + ' your attention.' : 'Stories readers have flagged for review.';
+    }
+
+    async function load() {
+        rowsEl.innerHTML = studio.skeletonRows(7, 4);
+        try {
+            reports = (await studio.list('blogs/reports')).map((r) => ({
+                id: String(r.ltId), postId: String(r.postId || ''), slug: r.postSlug || '', title: plain(r.title || ''),
+                postAuthor: plain(r.postAuthor || ''), reason: r.reason, details: plain(r.comments || ''),
+                reporter: plain(r.reportedBy || ''), status: r.status || 'pending', created: r.createdAt || ''
+            }));
+            render();
+        } catch (err) {
+            rowsEl.innerHTML = '<tr class="st-table__empty"><td colspan="7">' + TB.state('error', 'Unable to load reports', studio.explain(err)) + '</td></tr>';
+        }
+    }
+
+    $('#stRepTabs').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-status]');
+        if (!b) return;
+        status = b.dataset.status;
+        render();
+    });
+    $('#stRepRefresh').addEventListener('click', load);
+
+    rowsEl.addEventListener('click', async (e) => {
+        const tr = e.target.closest('tr[data-id]');
+        if (!tr) return;
+        const r = reports.find((x) => x.id === tr.dataset.id);
+        if (!r) return;
+        const to = e.target.closest('[data-status-to]');
+        if (to) {
+            try {
+                await api.post('blogs/reports/update-status', { ltId: r.id, status: to.dataset.statusTo });
+                r.status = to.dataset.statusTo;
+                render();
+                TB.toast('Report marked as ' + studio.statusLabel(r.status).toLowerCase(), 'success');
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+            return;
+        }
+        if (e.target.closest('[data-delete]')) {
+            const ok = await studio.confirm({ title: 'Delete this report?', text: 'The story itself is not affected.', confirmLabel: 'Delete report', danger: true });
+            if (!ok) return;
+            try {
+                await api.del('blogs/reports/' + encodeURIComponent(r.id));
+                reports = reports.filter((x) => x !== r);
+                render();
+                TB.toast('Report deleted', 'success');
+            } catch (err) { TB.toast(studio.explain(err), 'error'); }
+        }
+    });
+
+    load();
+});
+</script>

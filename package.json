@@ -1,0 +1,17 @@
+{
+    "ltId": "179269346583760",
+    "packageName": "ThemeBlog2026",
+    "packageType": "theme",
+    "version": "1.0.0",
+    "dependsOn": [
+        {
+            "packageName": "MdBlog",
+            "version": "2.0.0"
+        }
+    ],
+    "isPublished": "0",
+    "readme": "Editorial magazine blog theme for LifeTech OCMS, powered by the MdBlog module.",
+    "description": "Editorial magazine theme for MdBlog: featured stories, searchable archive, topic and author pages, long-form articles with comments and reactions, plus an editor Studio. Light/dark mode, fully responsive.",
+    "languageUsed": "html, css, javascript, php",
+    "ltVersion": "2.7.4"
+}
